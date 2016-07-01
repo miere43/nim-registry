@@ -118,22 +118,28 @@ proc writeValue*(handle: RegHandle, path, subkey, value: string): LONG
   return regSetKeyValue(handle, allocWinString(path), allocWinString(subkey),
     regSZ, valueWC.addr, (len(valueWC) + 1).DWORD)
 
-proc getString*(handle: RegHandle, path, name: string, 
+proc getString*(handle: RegHandle, subkey, key: string, 
     bufferLength: Natural = 64): string {.sideEffect.} =
   ## retrieves the specified registry string value. Only values of type
   ## ``REG_SZ`` and ``REG_EXPAND_SZ`` are returned, others produce ``nil``.
   var buff: pointer = alloc(bufferLength)
   var size: DWORD = bufferLength
   var kind: RegValueKind
-  let retval = regGetValue(handle, allocWinString(path), allocWinString(name),
+  let retval = regGetValue(handle, allocWinString(subkey), allocWinString(key),
     (RRF_RT_REG_SZ or RRF_RT_REG_EXPAND_SZ).DWORD, kind.addr, buff, size.addr)
   if retval == ERROR_MORE_DATA:
     # now `size` variable stores buffer length, required to store data
-    return getString(handle, path, name, size)
+    return getString(handle, subkey, key, size)
   if retval != ERROR_SUCCESS:
     return nil
   # now `size` variable stores amount of chars, required to construct string
   return $(cast[WinString](buff))
+
+proc getString*(handle: RegHandle, key: string,
+    bufferLength: Natural = 64): string {.inline.} =
+  ## alias of `getString(handle, nil, key, bufferLength)`. Use when you do not
+  ## need to access subkey.
+  return getString(handle, nil, key, bufferLength)
 
 proc delKey*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights = samDefault) {.sideEffect.} =
@@ -160,8 +166,9 @@ proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
 when isMainModule:
   var pass: bool = true
   try:
-    var k = open(HKEY_CURRENT_USER, "AppEvents", samRead)
-    close(k)
+    var kc = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
+    echo kc.getString("FaceName")
+    close(kc)
   except RegistryError:
     pass = false
   finally:
@@ -169,10 +176,3 @@ when isMainModule:
       echo "tests passed"
     else:
       echo "tests failed: ", getCurrentExceptionMsg()
-
-var kc = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
-echo kc.getString(nil, "FaceName")
-close(handle = kc)
-# var k = open(HKEY_CURRENT_USER, "AppEvents", samDelete)
-# delKey(k, "Shit", samDelete)
-# close(k)
