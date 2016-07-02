@@ -100,6 +100,10 @@ when useWinUnicode:
     lpSecurityAttributes: ptr SecurityAttributes, phkResult: ptr RegHandle,
     lpdwDisposition: ptr LONG): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegCreateKeyExW".}
+
+  proc regSetValueEx(handle: RegHandle, lpValueName: WinString, Reserved: DWORD,
+    dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegSetValueExW".}
 else:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
     samDesired: RegKeyRights, phkResult: PHKEY): LONG

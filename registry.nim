@@ -75,6 +75,12 @@ template injectRegPathSplit(path: string) =
   var subkey {.inject.}: string
   var root {.inject.}: RegHandle = parseRegPath(path, subkey)
 
+proc reallen(x: var WinString): int {.inline.} =
+  when declared(useWinUnicode):
+    return len(x) * 2 + 2
+  else:
+    return len(x) + 1
+
 proc createKeyInternal(handle: RegHandle, subkey: string,
   samDesired: RegKeyRights, outHandle: ptr RegHandle): LONG =
   regThrowOnFail(regCreateKeyEx(handle, allocWinString(subkey), 0.DWORD, nil,
@@ -98,7 +104,8 @@ proc createOrOpen*(handle: RegHandle, subkey: string,
   ## exists.
   discard createKeyInternal(handle, subkey, samDesired, result.addr)
 
-proc createOrOpen*(path: string, samDesired: RegKeyRights): RegHandle =
+proc createOrOpen*(path: string,
+    samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## same as `create(...)`, but does not raise ``RegistryError`` if key already
   ## exists.
   injectRegPathSplit(path)
@@ -109,6 +116,9 @@ proc open*(handle: RegHandle, subkey: string,
   ## opens the specified registry key. Note that key names are
   ## not case sensitive. Raises ``RegistryError`` when `handle` is invalid or
   ## `subkey` does not exist.
+  ##
+  ## .. code-block:: nim
+  ##   open(HKEY_LOCAL_MACHINE, "such\\yay", samRead).close()
   regThrowOnFail(regOpenKeyEx(handle, allocWinString(subkey), 0.DWORD,
     samDesired, result.addr))
 
@@ -116,6 +126,9 @@ proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
     {.sideEffect.} =
   ## same as `open`, but enables specifying path without using root `RegHandle`
   ## constants.
+  ##
+  ## .. code-block:: nim
+  ##   open("HKEY_LOCAL_MACHINE\\such\\yay", samRead).close()
   injectRegPathSplit(path)
   result = open(root, subkey, samDesired) 
 
@@ -125,11 +138,33 @@ proc close*(handle: RegHandle) {.sideEffect.} =
   ## registry handles as soon as possible.
   discard regCloseKey(handle)
 
-proc writeString*(handle: RegHandle, path, subkey, value: string): LONG
-    {.sideEffect.} = 
-  var valueWC = allocWinString(value)
-  return regSetKeyValue(handle, allocWinString(path), allocWinString(subkey),
-    regSZ, valueWC.addr, (len(valueWC) + 1).DWORD)
+proc close*(handles: varargs[RegHandle]) {.sideEffect.} =
+  ## same as `close`, but allows to close several handles at once.
+  for handle in items(handles):
+    close(handle)
+
+proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} = 
+  ## writes value of type ``REG_SZ`` to specified key. String-literal values
+  ## must be formatted using a backslash preceded by another backslash as an
+  ## escape character. For example, specify "C:\\mydir\\myfile" to store the
+  ## string "C:\mydir\myfile".
+  ##
+  ## .. code-block:: nim
+  ##   writeString(handle, "hello", "world")
+  var valueWS = allocWinString(value)
+  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regSZ,
+    cast[pointer](valueWS), (reallen(valueWS)).DWORD))
+
+proc writeInt32*(handle: RegHandle, key: string, value: int32) {.sideEffect.} =
+  ## writes value of type ``REG_DWORD`` to specified key.
+  var addrVal = value
+  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regDword,
+    addrVal.addr, sizeof(int32).DWORD))
+
+proc writeInt64*(handle: RegHandle, key: string, value: int64) {.sideEffect.} =
+  var addrVal = value
+  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regQword,
+    addrVal.addr, sizeof(int64).DWORD))
 
 template injectRegKeyReader(handle: RegHandle, key: string,
   allowedDataTypes: DWORD) {.immediate.} =
@@ -152,18 +187,18 @@ template injectRegKeyReader(handle: RegHandle, key: string,
 
 proc readString*(handle: RegHandle, key: string, value: var string)
     {.sideEffect.} =
-  ## reads value of type ``REG_SZ`` from registry entry.
+  ## reads value of type ``REG_SZ`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_SZ)
   value = $(cast[WinString](buff))
   dealloc(buff)
 
 proc readString*(handle: RegHandle, key: string): string {.inline.} =
-  ## reads value of type ``REG_SZ`` from registry entry.
+  ## reads value of type ``REG_SZ`` from registry key.
   readString(handle, key, result)
 
 proc readInt32*(handle: RegHandle, key: string, value: var int32)
     {.sideEffect.} =
-  ## reads value of type ``REG_DWORD`` from registry entry.
+  ## reads value of type ``REG_DWORD`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_DWORD)
   var intbuff = cast[cstring](buff)
   value = int32(byte(intbuff[0])) or (int32(byte(intbuff[1])) shl 8) or
@@ -171,7 +206,7 @@ proc readInt32*(handle: RegHandle, key: string, value: var int32)
   dealloc(buff)
 
 proc readInt32*(handle: RegHandle, key: string): int32 {.inline, sideEffect.} =
-  ## reads value of type ``REG_DWORD`` from registry entry.
+  ## reads value of type ``REG_DWORD`` from registry key.
   readInt32(handle, key, result)
 
 proc readInt64*(handle: RegHandle, key: string, value: var int64)
@@ -218,6 +253,11 @@ when isMainModule:
     h.readString("FaceName", faceName)
     h.readInt32("FontSize", fontSize)
     h.readInt32("FontWeight", fontWeight)
+    close(h)
+    h = open(HKEY_CURRENT_USER, "Console", samWrite)
+    h.writeString("hello", "world")
+    h.writeInt32("hello2", 1234)
+    h.writeInt64("hello3", 1234123412341234)
     close(h)
   except RegistryError, AssertionError:
     pass = false
