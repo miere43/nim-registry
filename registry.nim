@@ -6,19 +6,30 @@ include "private/winregistry"
 type
   RegistryError = object of Exception
 
-iterator splitRegPath(path: string): string =
-  var sliceStart = 0
+# iterator splitRegPath(path: string): string =
+#   var sliceStart = 0
+#   var sliceEnd = 0
+#   for c in path:
+#     if c == '\\':
+#       var s = substr(path, sliceStart, sliceEnd - 1)
+#       yield s
+#       inc sliceEnd
+#       sliceStart = sliceEnd
+#     else:
+#       inc sliceEnd
+#   if sliceStart != sliceEnd:
+#     yield substr(path, sliceStart, sliceEnd)
+
+proc splitRegPath(path: string, root: var string, other: var string): bool =
   var sliceEnd = 0
   for c in path:
     if c == '\\':
-      var s = substr(path, sliceStart, sliceEnd - 1)
-      yield s
-      inc sliceEnd
-      sliceStart = sliceEnd
+      root = substr(path, 0, sliceEnd - 1)
+      other = substr(path, sliceEnd + 1, len(path) - 1)
+      return true
     else:
       inc sliceEnd
-  if sliceStart != sliceEnd:
-    yield substr(path, sliceStart, sliceEnd)
+  return false;
 
 proc getPredefinedRegHandle(strkey: string): RegHandle =
   case strkey:
@@ -100,17 +111,9 @@ proc close*(handle: RegHandle) {.sideEffect.} =
 proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
     {.sideEffect.} =
   ## same as `open`
-  var prev, curr: RegHandle
-  var first: bool = true
-  for hkey in splitRegPath(path):
-    if first:
-      first = false
-      prev = open(getPredefinedRegHandle(hkey), nil, samDesired)
-      continue
-    curr = open(prev, hkey, samDesired)
-    close(prev)
-    prev = curr
-  result = curr 
+  var rootStr, otherStr: string
+  assert(true == splitRegPath(path, rootStr, otherStr))
+  result = open(getPredefinedRegHandle(rootStr), otherStr, samDesired) 
 
 proc writeValue*(handle: RegHandle, path, subkey, value: string): LONG
     {.sideEffect.} = 
