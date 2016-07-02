@@ -10,7 +10,7 @@ var
   fontSize: int32
   fontWeight: int32 
   h: RegHandle
-  
+
 try:
   h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
   h.readString("FaceName", faceName)
@@ -21,3 +21,7 @@ except RegistryError:
 finally:
   close(h)
 ```
+
+## TODO
+* impl. `read/writeBinary`, `read/writeExpandString`, `read/writeMultiString`
+* test with `useWinAscii`

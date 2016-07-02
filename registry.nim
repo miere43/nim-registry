@@ -162,6 +162,7 @@ proc writeInt32*(handle: RegHandle, key: string, value: int32) {.sideEffect.} =
     addrVal.addr, sizeof(int32).DWORD))
 
 proc writeInt64*(handle: RegHandle, key: string, value: int64) {.sideEffect.} =
+  ## writes value of type ``REG_QWORD`` to specified key.
   var addrVal = value
   regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regQword,
     addrVal.addr, sizeof(int64).DWORD))
