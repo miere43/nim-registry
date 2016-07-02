@@ -9,9 +9,10 @@ var
   faceName: string
   fontSize: int32
   fontWeight: int32 
-
+  h: RegHandle
+  
 try:
-  var h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
+  h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
   h.readString("FaceName", faceName)
   h.readInt32("FontSize", fontSize)
   h.readInt32("FontWeight", fontWeight)

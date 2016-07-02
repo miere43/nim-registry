@@ -112,18 +112,18 @@ proc open*(handle: RegHandle, subkey: string,
   regThrowOnFail(regOpenKeyEx(handle, allocWinString(subkey), 0.DWORD,
     samDesired, result.addr))
 
-proc close*(handle: RegHandle) {.sideEffect.} =
-  ## closes a registry `handle`. After using this proc, `handle` is no longer
-  ## valid and should not be used with any registry procedures. Try to close
-  ## registry handles as soon as possible.
-  discard regCloseKey(handle)
-
 proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
     {.sideEffect.} =
   ## same as `open`, but enables specifying path without using root `RegHandle`
   ## constants.
   injectRegPathSplit(path)
   result = open(root, subkey, samDesired) 
+
+proc close*(handle: RegHandle) {.sideEffect.} =
+  ## closes a registry `handle`. After using this proc, `handle` is no longer
+  ## valid and should not be used with any registry procedures. Try to close
+  ## registry handles as soon as possible.
+  discard regCloseKey(handle)
 
 proc writeString*(handle: RegHandle, path, subkey, value: string): LONG
     {.sideEffect.} = 
@@ -204,12 +204,6 @@ proc delKey*(handle: RegHandle, subkey: string,
 proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
   ## deletes the subkeys and values of the specified key recursively.
   regThrowOnFail(regDeleteTree(handle, allocWinString(subkey)))
-
-# template withRegKey(handle: RegHandle, body: untyped): expr =
-#   try:
-#     body
-#   finally:
-#     closeRegKey(handle)
 
 when isMainModule:
   var pass: bool = true
