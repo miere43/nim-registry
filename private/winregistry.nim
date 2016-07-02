@@ -25,8 +25,8 @@ type
     samEnumerateSubKeys = 8
     samNotify = 16
     samCreateLink = 32
-    samWow6464Key = 256
-    samWow6432Key = 512
+    samWow64 = 256
+    samWow32 = 512
     samDelete = 65536
     samReadControl = 131072
     samWrite = 131078
@@ -34,6 +34,12 @@ type
     samWriteDac = 262144
     samWriteOwner = 524288
     samAll = 983103
+  SecurityAttributes {.final, pure.} = object
+    nLength: DWORD
+    lpSecurityDescriptor: pointer
+    bInheritHandle: WINBOOL
+
+proc `==`(x: RegHandle, y: RegHandle): bool {.borrow.}
 
 when declared(useWinUnicode):
   type WinString* = WideCString ## ``cstring`` when ``useWinAscii`` 
@@ -52,12 +58,17 @@ const
   HKEY_DYN_DATA*: RegHandle = 0x80000006.RegHandle
   #KEY_ALL_ACCESS = 0xF003F
 
+  REG_CREATED_NEW_KEY = 0x00000001.LONG
+  REG_OPENED_EXISTING_KEY = 0x00000002.LONG
+
   ERROR_SUCCESS = 0x0.LONG
   ERROR_MORE_DATA = 234.LONG
 
   RRF_RT_ANY = 0x0000ffff.DWORD
   RRF_RT_REG_SZ = 0x00000002.DWORD
   RRF_RT_REG_EXPAND_SZ = 0x00000004.DWORD
+  RRF_RT_REG_DWORD = 0x00000010.DWORD
+  RRF_RT_REG_QWORD = 0x00000040.DWORD
   #RRF_RT_REG_MULTI_SZ = 0x00000020.DWORD
 
 proc regCloseKey(handle: RegHandle): LONG
@@ -83,6 +94,12 @@ when useWinUnicode:
 
   proc regDeleteTree(handle: RegHandle, lpSubKey: WinString): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegDeleteTreeW".}
+
+  proc regCreateKeyEx(handle: RegHandle, lpSubKey: WinString, Reserved: DWORD,
+    lpClass: cstring, dwOptions: DWORD, samDesired: RegKeyRights,
+    lpSecurityAttributes: ptr SecurityAttributes, phkResult: ptr RegHandle,
+    lpdwDisposition: ptr LONG): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegCreateKeyExW".}
 else:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
     samDesired: RegKeyRights, phkResult: PHKEY): LONG
