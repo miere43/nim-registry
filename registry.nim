@@ -37,7 +37,7 @@ proc parseRegPath(path: string, outSubkey: var string): RegHandle =
     raise newException(RegistryError, "unsupported path root")
 
 proc allocWinString(str: string): WinString {.inline.} =
-  when declared(useWinUnicode):
+  when useWinUnicode:
     if str == nil:
       return WideCString(nil)
     return newWideCString(str)
@@ -52,13 +52,13 @@ proc regThrowOnFailInternal(hresult: LONG): void =
   var result: string = nil
   when useWinUnicode:
     var msgbuf: WideCString
-    if formatMessageW(0x00000100 or 0x00001000 or 0x00000200,
+    if formatMessageW(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
                       nil, hresult.int32, langid, msgbuf.addr, 0, nil) != 0'i32:
       result = $msgbuf
       if msgbuf != nil: localFree(cast[pointer](msgbuf))
   else:
     var msgbuf: cstring
-    if formatMessageA(0x00000100 or 0x00001000 or 0x00000200,
+    if formatMessageA(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
                     nil, hresult.int32, langid, msgbuf.addr, 0, nil) != 0'i32:
       result = $msgbuf
       if msgbuf != nil: localFree(msgbuf)
@@ -155,6 +155,12 @@ proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} =
   regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regSZ,
     cast[pointer](valueWS), (reallen(valueWS)).DWORD))
 
+proc writeExpandString*(handle: RegHandle, key, value: string) {.sideEffect.} =
+  ## writes value of type ``REG_EXPAND_SZ`` to specified key.
+  var valueWS = allocWinString(value)
+  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD,
+    regExpandSZ, cast[pointer](valueWS), (reallen(valueWS)).DWORD))
+
 proc writeInt32*(handle: RegHandle, key: string, value: int32) {.sideEffect.} =
   ## writes value of type ``REG_DWORD`` to specified key.
   var addrVal = value
@@ -179,51 +185,45 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     buff, size.addr)
   if returnValue == ERROR_MORE_DATA:
     # TODO: impl. for HKEY_PERFORMANCE_DATA
-    dealloc(buff)
     # size now stores amount of bytes, required to store value in array
-    buff = alloc(size)
+    buff = realloc(buff, size)
     returnValue = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
       buff, size.addr)
-  regThrowOnFail(returnValue)
+  if returnValue != ERROR_SUCCESS:
+    dealloc(buff)
+    regThrowOnFailInternal(returnValue)
 
-proc readString*(handle: RegHandle, key: string, value: var string)
-    {.sideEffect.} =
+proc readString*(handle: RegHandle, key: string): string {.sideEffect.} =
   ## reads value of type ``REG_SZ`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_SZ)
-  value = $(cast[WinString](buff))
+  result = $(cast[WinString](buff))
   dealloc(buff)
 
-proc readString*(handle: RegHandle, key: string): string {.inline.} =
-  ## reads value of type ``REG_SZ`` from registry key.
-  readString(handle, key, result)
+proc readExpandString*(handle: RegHandle, key: string): string {.sideEffect.} =
+  ## reads value of type ``REG_EXPAND_SZ`` from registry key.
+  ## Use `expandEnvString` proc to expand environment variables.
+  # data not supported error thrown without RRF_NOEXPAND 
+  injectRegKeyReader(handle, key, RRF_RT_REG_EXPAND_SZ or RRF_NOEXPAND)
+  result = $(cast[WinString](buff))
+  dealloc(buff)
 
-proc readInt32*(handle: RegHandle, key: string, value: var int32)
-    {.sideEffect.} =
+proc readInt32*(handle: RegHandle, key: string): int32 {.sideEffect.} =
   ## reads value of type ``REG_DWORD`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_DWORD)
   var intbuff = cast[cstring](buff)
-  value = int32(byte(intbuff[0])) or (int32(byte(intbuff[1])) shl 8) or
+  result = int32(byte(intbuff[0])) or (int32(byte(intbuff[1])) shl 8) or
     (int32(byte(intbuff[2])) shl 16) or (int32(byte(intbuff[3])) shl 24)
   dealloc(buff)
 
-proc readInt32*(handle: RegHandle, key: string): int32 {.inline, sideEffect.} =
-  ## reads value of type ``REG_DWORD`` from registry key.
-  readInt32(handle, key, result)
-
-proc readInt64*(handle: RegHandle, key: string, value: var int64)
-    {.sideEffect.} =
+proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
   ## reads value of type ``REG_QWORD`` from registry entry.
   injectRegKeyReader(handle, key, RRF_RT_REG_QWORD)
   var intbuff = cast[cstring](buff)
-  value = int64(byte(intbuff[0])) or (int64(byte(intbuff[1])) shl 8) or
+  result = int64(byte(intbuff[0])) or (int64(byte(intbuff[1])) shl 8) or
     (int64(byte(intbuff[2])) shl 16) or (int64(byte(intbuff[3])) shl 24) or
     (int64(byte(intbuff[4])) shl 32) or (int64(byte(intbuff[5])) shl 40) or
     (int64(byte(intbuff[6])) shl 48) or (int64(byte(intbuff[7])) shl 56)
   dealloc(buff)
-
-proc readInt64*(handle: RegHandle, key: string): int64 {.inline, sideEffect.} =
-  ## reads value of type ``REG_QWORD`` from registry entry.
-  readInt64(handle, key, result)
 
 proc delKey*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights = samDefault) {.sideEffect.} =
@@ -234,38 +234,58 @@ proc delKey*(handle: RegHandle, subkey: string,
   ## To delete keys recursively, use the ``delTree``.
   ##
   ## `samDesired` should be ``samWow32`` or ``samWow64``.
-  regThrowOnFail(regDeleteKeyEx(handle, allocWinString(subkey),
-    samDesired,0.DWORD))
+  regThrowOnFail(regDeleteKeyEx(handle, allocWinString(subkey), samDesired,
+    0.DWORD))
 
 proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
   ## deletes the subkeys and values of the specified key recursively.
   regThrowOnFail(regDeleteTree(handle, allocWinString(subkey)))
 
+proc expandEnvString(str: string): string =
+  ## helper proc to expand strings returned by `readExpandString`. If string
+  ## cannot be expanded, ``nil`` returned.
+  var
+    size: Natural = 32 * sizeof(WinChar)
+    buff: pointer = alloc(size)
+    valueWS = allocWinString(str)
+  var returnValue = expandEnvironmentStrings(valueWS, buff, size)
+  if returnValue == 0:
+    dealloc(buff)
+    return nil
+  # return value is in TCHARs, aka number of chars returned, not number of
+  # bytes required to store string
+  # WinChar is `char` or `Utf16Char` depending on useWinUnicode const in winlean
+  # actually needs to be checked because without this line everything works okay
+  returnValue = returnValue * sizeof(WinChar).DWORD
+  if returnValue > size:
+    # buffer size was not enough to expand string
+    size = returnValue
+    buff = realloc(buff, size)
+    returnValue = expandEnvironmentStrings(valueWS, buff, size)
+  if returnValue == 0:
+    dealloc(buff)
+    return nil
+  result = $(cast[WinString](buff))
+  dealloc(buff)
+
 when isMainModule:
   var pass: bool = true
-  var msg: string
+  var msg, stacktrace: string
   var h: RegHandle
   try:
-    var
-      faceName: string
-      fontSize: int32
-      fontWeight: int32 
     h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
-    h.readString("FaceName", faceName)
-    h.readInt32("FontSize", fontSize)
-    h.readInt32("FontWeight", fontWeight)
-    close(h)
-    h = open(HKEY_CURRENT_USER, "Console", samWrite)
-    h.writeString("hello", "world")
-    h.writeInt32("hello2", 1234)
-    h.writeInt64("hello3", 1234123412341234)
-    close(h)
+    echo "expand ", h.readExpandString("Expand").expandEnvString()
+    echo "no expand ", h.readExpandString("Expand")
   except RegistryError, AssertionError:
     pass = false
     msg = getCurrentExceptionMsg()
+    stacktrace = getStackTrace(getCurrentException())
   finally:
     close(h)
     if pass:
       echo "tests passed"
+      quit(QuitSuccess)
     else:
       echo "tests failed: ", msg
+      echo stacktrace
+      quit(QuitFailure)

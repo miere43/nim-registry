@@ -41,7 +41,7 @@ type
 
 proc `==`(x: RegHandle, y: RegHandle): bool {.borrow.}
 
-when declared(useWinUnicode):
+when useWinUnicode:
   type WinString* = WideCString ## ``cstring`` when ``useWinAscii`` 
                                 ## is declared or  ``WideCString`` otherwise.
 else:
@@ -59,16 +59,17 @@ const
   #KEY_ALL_ACCESS = 0xF003F
 
   REG_CREATED_NEW_KEY = 0x00000001.LONG
-  REG_OPENED_EXISTING_KEY = 0x00000002.LONG
+  # REG_OPENED_EXISTING_KEY = 0x00000002.LONG
 
   ERROR_SUCCESS = 0x0.LONG
   ERROR_MORE_DATA = 234.LONG
 
-  RRF_RT_ANY = 0x0000ffff.DWORD
+  # RRF_RT_ANY = 0x0000ffff.DWORD
   RRF_RT_REG_SZ = 0x00000002.DWORD
   RRF_RT_REG_EXPAND_SZ = 0x00000004.DWORD
   RRF_RT_REG_DWORD = 0x00000010.DWORD
   RRF_RT_REG_QWORD = 0x00000040.DWORD
+  RRF_NOEXPAND = 0x10000000.DWORD
   #RRF_RT_REG_MULTI_SZ = 0x00000020.DWORD
 
 proc regCloseKey(handle: RegHandle): LONG
@@ -79,9 +80,9 @@ when useWinUnicode:
     samDesired: RegKeyRights, phkResult: PHKEY): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExW".}
 
-  proc regSetKeyValue(handle: RegHandle, lpSubKey, lpValueName: WinString,
-    dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegSetKeyValueW".}
+  # proc regSetKeyValue(handle: RegHandle, lpSubKey, lpValueName: WinString,
+  #   dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
+  #   {.stdcall, dynlib: "advapi32", importc: "RegSetKeyValueW".}
 
   proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WinString,
     dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
@@ -104,14 +105,18 @@ when useWinUnicode:
   proc regSetValueEx(handle: RegHandle, lpValueName: WinString, Reserved: DWORD,
     dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegSetValueExW".}
+
+  proc expandEnvironmentStrings(lpSrc: WinString, lpDst: pointer,
+    nSize: DWORD): DWORD
+    {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsW".}
 else:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
     samDesired: RegKeyRights, phkResult: PHKEY): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExA".}
 
-  proc regSetKeyValue(handle: RegHandle, lpSubKey, lpValueName: WinString,
-    dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegSetKeyValueA".}
+  # proc regSetKeyValue(handle: RegHandle, lpSubKey, lpValueName: WinString,
+  #   dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
+  #   {.stdcall, dynlib: "advapi32", importc: "RegSetKeyValueA".}
 
   proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WinString,
     dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
@@ -124,3 +129,17 @@ else:
 
   proc regDeleteTree(handle: RegHandle, lpSubKey: WinString): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegDeleteTreeA".}
+
+  proc regCreateKeyEx(handle: RegHandle, lpSubKey: WinString, Reserved: DWORD,
+    lpClass: cstring, dwOptions: DWORD, samDesired: RegKeyRights,
+    lpSecurityAttributes: ptr SecurityAttributes, phkResult: ptr RegHandle,
+    lpdwDisposition: ptr LONG): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegCreateKeyExA".}
+
+  proc regSetValueEx(handle: RegHandle, lpValueName: WinString, Reserved: DWORD,
+    dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegSetValueExA".}
+
+  proc expandEnvironmentStrings(lpSrc: WinString, lpDst: pointer,
+    nSize: DWORD): DWORD
+    {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsA".}

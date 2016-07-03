@@ -13,9 +13,9 @@ var
 
 try:
   h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
-  h.readString("FaceName", faceName)
-  h.readInt32("FontSize", fontSize)
-  h.readInt32("FontWeight", fontWeight)
+  faceName = h.readString("FaceName")
+  fontSize = h.readInt32("FontSize")
+  fontWeight = h.readInt32("FontWeight")
 except RegistryError:
   echo "err: ", getCurrentExceptionMsg()
 finally:
@@ -23,5 +23,7 @@ finally:
 ```
 
 ## TODO
-* impl. `read/writeBinary`, `read/writeExpandString`, `read/writeMultiString`
+* impl. `read/writeBinary`, `read/writeMultiString`
+* proc to iterate over subkeys
 * test with `useWinAscii`
+* add tests
