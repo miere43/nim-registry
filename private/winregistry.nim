@@ -20,8 +20,8 @@ type
     samDefault = 0
     samQueryValue = 1
     samSetValue = 2
-    samCreateSubKey = 4
-    samEnumerateSubKeys = 8
+    samCreateSubkey = 4
+    samEnumSubkeys = 8
     samNotify = 16
     samCreateLink = 32
     samWow64 = 256
@@ -68,7 +68,7 @@ const
   ERROR_MORE_DATA = 234.LONG
   ERROR_NO_MORE_ITEMS = 259.LONG
 
-  # RRF_RT_ANY = 0x0000ffff.DWORD
+  RRF_RT_REG_BINARY = 0x00000008.DWORD
   RRF_RT_REG_SZ = 0x00000002.DWORD
   RRF_RT_REG_MULTI_SZ = 0x00000020.DWORD
   RRF_RT_REG_EXPAND_SZ = 0x00000004.DWORD
@@ -159,3 +159,15 @@ else:
   proc expandEnvironmentStrings(lpSrc: WinString, lpDst: pointer,
     nSize: DWORD): DWORD
     {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsA".}
+
+  proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WinString,
+    lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WinString,
+    lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
+    {.stdcall, dynlib: "kernel32", importc: "RegEnumKeyExA".}
+
+  proc regQueryInfoKey(hKey: RegHandle, lpClass: WinString, lpcClass: ptr DWORD,
+    lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
+    lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
+    lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
+    lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
+    {.stdcall, dynlib: "kernel32", importc: "RegQueryInfoKeyA".}

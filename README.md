@@ -22,7 +22,10 @@ finally:
   close(h)
 ```
 
-## TODO
-* impl. `read/writeBinary`, `read/writeMultiString`
-* test with `useWinAscii`
-* add tests
+## Tests
+Run in command line:
+```nim
+$ nim c -r registry.nim
+$ nim c -r -d:useWinAnsi registry.nim
+```
+You should see a "tests passed" message.
