@@ -89,12 +89,18 @@ proc createKeyInternal(handle: RegHandle, subkey: string,
 proc create*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
+  ##
+  ## .. code-block:: nim
+  ##   create(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
   if createKeyInternal(handle, subkey, samDesired, result.addr) !=
       REG_CREATED_NEW_KEY:
     raise newException(RegistryError, "key already exists")
   
 proc create*(path: string, samDesired: RegKeyRights): RegHandle {.inline.} =
   ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
+  ##
+  ## .. code-block:: nim
+  ##   create("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
   injectRegPathSplit(path)
   create(root, subkey, samDesired)
 
@@ -102,12 +108,18 @@ proc createOrOpen*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## same as `create(...)`, but does not raise ``RegistryError`` if key already
   ## exists.
+  ##
+  ## .. code-block:: nim
+  ##   createOrOpen(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
   discard createKeyInternal(handle, subkey, samDesired, result.addr)
 
 proc createOrOpen*(path: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## same as `create(...)`, but does not raise ``RegistryError`` if key already
   ## exists.
+  ##
+  ## .. code-block:: nim
+  ##   createOrOpen("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
   injectRegPathSplit(path)
   result = createOrOpen(root, subkey, samDesired)
 
@@ -118,7 +130,7 @@ proc open*(handle: RegHandle, subkey: string,
   ## `subkey` does not exist.
   ##
   ## .. code-block:: nim
-  ##   open(HKEY_LOCAL_MACHINE, "such\\yay", samRead).close()
+  ##   open(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
   regThrowOnFail(regOpenKeyEx(handle, allocWinString(subkey), 0.DWORD,
     samDesired, result.addr))
 
@@ -128,7 +140,7 @@ proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
   ## constants.
   ##
   ## .. code-block:: nim
-  ##   open("HKEY_LOCAL_MACHINE\\such\\yay", samRead).close()
+  ##   open("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
   injectRegPathSplit(path)
   result = open(root, subkey, samDesired) 
 
@@ -136,12 +148,73 @@ proc close*(handle: RegHandle) {.sideEffect.} =
   ## closes a registry `handle`. After using this proc, `handle` is no longer
   ## valid and should not be used with any registry procedures. Try to close
   ## registry handles as soon as possible.
+  ##
+  ## .. code-block:: nim
+  ##   var h = open(HKEY_LOCAL_MACHINE, "Software", samRead)
+  ##   close(h)
   discard regCloseKey(handle)
 
 proc close*(handles: varargs[RegHandle]) {.sideEffect.} =
   ## same as `close`, but allows to close several handles at once.
+  ##
+  ## .. code-block:: nim
+  ##   var h1 = open(HKEY_LOCAL_MACHINE, "Software", samRead)
+  ##   var h2 = open(HKEY_LOCAL_MACHINE, "Hardware", samRead)
+  ##   close(h1, h2)
   for handle in items(handles):
     close(handle)
+
+proc queryMaxKeyLength(handle: RegHandle): DWORD {.sideEffect.} =
+  regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
+    nullDwordPtr, nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr,
+    nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
+
+proc numValues*(handle: RegHandle): int32 {.sideEffect.} =
+  ## returns number of values that are associated with the registry key.
+  ## The key must have been opened with the ``samQueryValue`` access right.
+  ##
+  ## .. code-block:: nim
+  ##   echo numValues(HKEY_LOCAL_MACHINE)
+  regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
+    nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr, result.addr,
+    nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
+
+proc numSubkeys*(handle: RegHandle): int32 {.sideEffect.} =
+  ## returns number of subkeys that are contained by the specified key.
+  ## The key must have been opened with the ``samQueryValue`` access right.
+  regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
+    nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr, nullDwordPtr,
+    nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
+
+iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
+  ## enumerates through each subkey of the specified registry key.
+  ## The key must have been opened with the ``samQueryValue`` access right.
+  var
+    index = 0.DWORD
+    sizeChars = queryMaxKeyLength(handle) + 1
+    numCharsReaded = sizeChars
+    buff = alloc(sizeChars * sizeof(WinChar))
+  while true:
+    var returnValue = regEnumKeyEx(handle, index, cast[WinString](buff),
+      numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WinString](0),
+      cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
+    # if returnValue == ERROR_MORE_DATA:
+    #   # numCharsReaded now stores num of chars required to store string
+    #   # WITHOUT TERMINATING NULL CHAR. stupid winapi T_T
+    #   echo "realloc, ", sizeChars, " -> ", numCharsReaded + 1
+    #   sizeChars = numCharsReaded + 1
+    #   buff = realloc(buff, sizeChars * sizeof(WinChar))
+    #   continue
+    if returnValue == ERROR_NO_MORE_ITEMS:
+      dealloc(buff)
+      break;
+    if returnValue in {ERROR_MORE_DATA, ERROR_SUCCESS}:
+      yield $(cast[WinString](buff))
+      inc index
+    else:
+      dealloc(buff)
+      regThrowOnFailInternal(returnValue)
+      break
 
 proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} = 
   ## writes value of type ``REG_SZ`` to specified key. String-literal values
@@ -225,6 +298,13 @@ proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
     (int64(byte(intbuff[6])) shl 48) or (int64(byte(intbuff[7])) shl 56)
   dealloc(buff)
 
+# proc readMultiString*(handle: RegHandle, key: string): seq[string]
+#     {.sideEffect.} =
+#   injectRegKeyReader(handle, key, RRF_RT_REG_MULTI_SZ)
+#   result = @[]
+#   # each string separated by '\0', last string is `\0\0`
+#   while true:
+
 proc delKey*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights = samDefault) {.sideEffect.} =
   ## deletes a subkey and its values from the specified platform-specific
@@ -241,9 +321,12 @@ proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
   ## deletes the subkeys and values of the specified key recursively.
   regThrowOnFail(regDeleteTree(handle, allocWinString(subkey)))
 
-proc expandEnvString(str: string): string =
+proc expandEnvString*(str: string): string =
   ## helper proc to expand strings returned by `readExpandString`. If string
   ## cannot be expanded, ``nil`` returned.
+  ##
+  ## .. code-block:: nim
+  ##  echo expandEnvString("%PATH%") # => C:\Windows;C:\Windows\system32...
   var
     size: Natural = 32 * sizeof(WinChar)
     buff: pointer = alloc(size)
@@ -273,9 +356,10 @@ when isMainModule:
   var msg, stacktrace: string
   var h: RegHandle
   try:
-    h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samRead)
-    echo "expand ", h.readExpandString("Expand").expandEnvString()
-    echo "no expand ", h.readExpandString("Expand")
+    h = open("HKEY_CURRENT_USER\\Console\\Git Bash", samAll)
+    echo "num vals: ", numValues(h)
+    for sk in enumSubkeys(h):
+      echo sk
   except RegistryError, AssertionError:
     pass = false
     msg = getCurrentExceptionMsg()

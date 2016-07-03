@@ -24,6 +24,5 @@ finally:
 
 ## TODO
 * impl. `read/writeBinary`, `read/writeMultiString`
-* proc to iterate over subkeys
 * test with `useWinAscii`
 * add tests

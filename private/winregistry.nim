@@ -1,5 +1,4 @@
 import dynlib, winlean
-
 type
   RegHandle = distinct HANDLE
   PHKEY = ptr RegHandle
@@ -49,6 +48,10 @@ else:
                             ## is declared or  ``WideCString`` otherwise.
 
 const
+  nullDwordPtr: ptr DWORD = cast[ptr DWORD](0)
+let nullWinString: WinString = cast[WinString](0)
+
+const
   HKEY_CLASSES_ROOT*: RegHandle = 0x80000000.RegHandle
   HKEY_CURRENT_USER*: RegHandle = 0x80000001.RegHandle
   HKEY_LOCAL_MACHINE*: RegHandle = 0x80000002.RegHandle
@@ -63,14 +66,15 @@ const
 
   ERROR_SUCCESS = 0x0.LONG
   ERROR_MORE_DATA = 234.LONG
+  ERROR_NO_MORE_ITEMS = 259.LONG
 
   # RRF_RT_ANY = 0x0000ffff.DWORD
   RRF_RT_REG_SZ = 0x00000002.DWORD
+  RRF_RT_REG_MULTI_SZ = 0x00000020.DWORD
   RRF_RT_REG_EXPAND_SZ = 0x00000004.DWORD
   RRF_RT_REG_DWORD = 0x00000010.DWORD
   RRF_RT_REG_QWORD = 0x00000040.DWORD
   RRF_NOEXPAND = 0x10000000.DWORD
-  #RRF_RT_REG_MULTI_SZ = 0x00000020.DWORD
 
 proc regCloseKey(handle: RegHandle): LONG
   {.stdcall, dynlib: "advapi32", importc: "RegCloseKey".}
@@ -109,6 +113,18 @@ when useWinUnicode:
   proc expandEnvironmentStrings(lpSrc: WinString, lpDst: pointer,
     nSize: DWORD): DWORD
     {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsW".}
+
+  proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WinString,
+    lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WinString,
+    lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
+    {.stdcall, dynlib: "kernel32", importc: "RegEnumKeyExW".}
+
+  proc regQueryInfoKey(hKey: RegHandle, lpClass: WinString, lpcClass: ptr DWORD,
+    lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
+    lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
+    lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
+    lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
+    {.stdcall, dynlib: "kernel32", importc: "RegQueryInfoKeyW".}
 else:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
     samDesired: RegKeyRights, phkResult: PHKEY): LONG
