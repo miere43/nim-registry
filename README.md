@@ -24,7 +24,7 @@ finally:
 
 ## Tests
 Run in command line:
-```nim
+```
 $ nim c -r registry.nim
 $ nim c -r -d:useWinAnsi registry.nim
 ```

@@ -1,4 +1,4 @@
-## This contains procedures that provide access to Windows registry.
+## This module contains procedures that provide access to Windows registry.
 
 ## .. include:: doc/modulespec.rst 
 include "private/winregistry"
