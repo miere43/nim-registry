@@ -437,9 +437,6 @@ when isMainModule:
   var msg, stacktrace: string
   var h: RegHandle
   try:
-    var g = open("HKEY_LOCAL_MACHINE\\SOFTWARE\\7-Zip", samRead or samWow64)
-    echo countValues(g)
-    close g
     h = create("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
       samRead or samWrite or samWow32)
     h.writeString("strkey", "strval")
