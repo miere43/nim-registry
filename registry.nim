@@ -1,10 +1,11 @@
-## This module contains procedures that provide access to Windows registry.
-
+## This module contains procedures that provide access to Windows Registry.
+##
 ## .. include:: doc/modulespec.rst 
 include "private/winregistry"
 
 type
-  RegistryError = object of Exception
+  RegistryError* = object of Exception ## raised when registry-related 
+                                       ## error occurs.
 
 proc splitRegPath(path: string, root: var string, other: var string): bool =
   var sliceEnd = 0
@@ -76,13 +77,14 @@ template injectRegPathSplit(path: string) =
   var root {.inject.}: RegHandle = parseRegPath(path, subkey)
 
 proc reallen(x: WinString): int {.inline.} =
+  ## returns real string length in bytes, counts chars and terminating null.
   when declared(useWinUnicode):
     return len(x) * 2 + 2
   else:
     return len(x) + 1
 
 proc createKeyInternal(handle: RegHandle, subkey: string,
-  samDesired: RegKeyRights, outHandle: ptr RegHandle): LONG =
+  samDesired: RegKeyRights, outHandle: ptr RegHandle): LONG {.sideEffect.} =
   regThrowOnFail(regCreateKeyEx(handle, allocWinString(subkey), 0.DWORD, nil,
     0.DWORD, samDesired, nil, outHandle, result.addr))
 
@@ -91,7 +93,7 @@ proc create*(handle: RegHandle, subkey: string,
   ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
   ##
   ## .. code-block:: nim
-  ##   create(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
+  ##   create(HKEY_LOCAL_MACHINE, "Software\\My Soft", samRead or samWrite)
   if createKeyInternal(handle, subkey, samDesired, result.addr) !=
       REG_CREATED_NEW_KEY:
     raise newException(RegistryError, "key already exists")
@@ -100,13 +102,13 @@ proc create*(path: string, samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
   ##
   ## .. code-block:: nim
-  ##   create("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
+  ##   create("HKEY_LOCAL_MACHINE\\Software\\My Soft", samRead or samWrite)
   injectRegPathSplit(path)
   create(root, subkey, samDesired)
 
 proc createOrOpen*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
-  ## same as `create(...)`, but does not raise ``RegistryError`` if key already
+  ## same as ``create(...)``, but does not raise ``RegistryError`` if key already
   ## exists.
   ##
   ## .. code-block:: nim
@@ -115,7 +117,7 @@ proc createOrOpen*(handle: RegHandle, subkey: string,
 
 proc createOrOpen*(path: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
-  ## same as `create(...)`, but does not raise ``RegistryError`` if key already
+  ## same as ``create(...)``, but does not raise ``RegistryError`` if key already
   ## exists.
   ##
   ## .. code-block:: nim
@@ -136,13 +138,19 @@ proc open*(handle: RegHandle, subkey: string,
 
 proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
     {.sideEffect.} =
-  ## same as `open`, but enables specifying path without using root `RegHandle`
-  ## constants.
+  ## same as ``open``, but enables specifying path without using
+  ## root `RegHandle`  constants.
   ##
   ## .. code-block:: nim
   ##   open("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
   injectRegPathSplit(path)
   result = open(root, subkey, samDesired) 
+
+proc openCurrentUser*(samDesired: RegKeyRights = samDefault): RegHandle
+  {.sideEffect.} =
+  ## retrieves a handle to the ``HKEY_CURRENT_USER`` key for
+  ## the user the current thread is impersonating.
+  regThrowOnFail(regOpenCurrentUser(samDesired, result.addr))
 
 proc close*(handle: RegHandle) {.sideEffect.} =
   ## closes a registry `handle`. After using this proc, `handle` is no longer
@@ -154,8 +162,8 @@ proc close*(handle: RegHandle) {.sideEffect.} =
   ##   close(h)
   discard regCloseKey(handle)
 
-proc close*(handles: varargs[RegHandle]) {.sideEffect.} =
-  ## same as `close`, but allows to close several handles at once.
+proc close*(handles: varargs[RegHandle]) {.inline, sideEffect.} =
+  ## same as ``close(...)``, but allows to close several handles at once.
   ##
   ## .. code-block:: nim
   ##   var h1 = open(HKEY_LOCAL_MACHINE, "Software", samRead)
@@ -173,9 +181,6 @@ proc countValues*(handle: RegHandle): int32 {.sideEffect.} =
   ## returns number of key-value pairs that are associated with the
   ## specified registry key. Does not count default key-value pair.
   ## The key must have been opened with the ``samQueryValue`` access right.
-  ##
-  ## .. code-block:: nim
-  ##   echo numValues(HKEY_LOCAL_MACHINE)
   regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr, result.addr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
@@ -220,8 +225,7 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
 proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} = 
   ## writes value of type ``REG_SZ`` to specified key. String-literal values
   ## must be formatted using a backslash preceded by another backslash as an
-  ## escape character. For example, specify "C:\\mydir\\myfile" to store the
-  ## string "C:\mydir\myfile".
+  ## escape character.
   ##
   ## .. code-block:: nim
   ##   writeString(handle, "hello", "world")
@@ -433,9 +437,15 @@ when isMainModule:
   var msg, stacktrace: string
   var h: RegHandle
   try:
-    h = createOrOpen("HKEY_LOCAL_MACHINE\\Software\\_nim-registry-test", samAll)
+    var g = open("HKEY_LOCAL_MACHINE\\SOFTWARE\\7-Zip", samRead or samWow64)
+    echo countValues(g)
+    close g
+    h = create("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
+      samRead or samWrite or samWow32)
     h.writeString("strkey", "strval")
     assert(h.readString("strkey") == "strval")
+    h.writeString("path", "C:\\dir\\myfile")
+    assert h.readString("path") == "C:\\dir\\myfile"
     h.writeBinary("hello", [0xff.byte, 0x00])
     var dat = h.readBinary("hello")
     assert(dat[0] == 0xff)
@@ -457,7 +467,7 @@ when isMainModule:
     close(x)
     h.delSubkey("test_sk")
     close(h)
-    HKEY_LOCAL_MACHINE.delSubkey("Software\\_nim-registry-test")
+    HKEY_LOCAL_MACHINE.delSubkey("Software\\AAAnim_reg_test", samWow32)
     #for sk in enumSubkeys(h):
     #  echo sk
   except RegistryError, AssertionError:

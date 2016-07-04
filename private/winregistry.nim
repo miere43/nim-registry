@@ -28,17 +28,36 @@ type
     samWow32 = 512
     samDelete = 65536
     samReadControl = 131072
-    samWrite = 131078
+    # combines ``samReadControl``, ``samSetValue``, ``samCreateSubkey``
+    samWrite = 131078 
+    # combines ``samReadControl``, ``samQueryValue``, ``samEnumSubkeys``,
+    # ``samNotify``
     samRead = 131097
     samWriteDac = 262144
     samWriteOwner = 524288
+    # combines everything except ``samWow32`` and ``samWow64``
     samAll = 983103
   SecurityAttributes {.final, pure.} = object
     nLength: DWORD
     lpSecurityDescriptor: pointer
     bInheritHandle: WINBOOL
 
-proc `==`(x: RegHandle, y: RegHandle): bool {.borrow.}
+proc `==`*(x, y: RegHandle): bool {.inline.} =
+  ## the ``==`` operator for ``RegHandle``.
+  result = ord(x) == ord(y)
+
+proc `!=`*(x, y: RegHandle): bool {.inline.} =
+  ## the ``!=`` operator for ``RegHandle``
+  result = not (x == y)
+
+proc `or`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
+  ## the ``or`` operator for ``RegKeyRights``.
+  result = RegKeyRights(ord(a) or ord(b))
+
+proc `|`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
+  ## alias of ``or`` for ``RegKeyRights``.
+  result = a or b
+
 
 when useWinUnicode:
   type WinString* = WideCString ## ``cstring`` when ``useWinAscii`` 
@@ -78,6 +97,10 @@ const
 
 proc regCloseKey(handle: RegHandle): LONG
   {.stdcall, dynlib: "advapi32", importc: "RegCloseKey".}
+
+proc regOpenCurrentUser(samDesired: RegKeyRights,
+  phkResult: ptr RegHandle): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegOpenCurrentUser".}
 
 when useWinUnicode:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
