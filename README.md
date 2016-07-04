@@ -2,6 +2,8 @@
 
 Deal with Windows Registry from Nim.
 
+Online docs here: http://miere.ru/docs/registry/
+
 ```nim
 import registry
 
