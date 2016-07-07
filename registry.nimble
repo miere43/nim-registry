@@ -2,7 +2,7 @@
 name        = "registry"
 version     = "0.1.2"
 author      = "Vladislav <miere> Vorobiev"
-description = "Deal with Windows registry from Nim"
+description = "Deal with Windows Registry from Nim"
 license     = "MIT"
 
 [Deps]

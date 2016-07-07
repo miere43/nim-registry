@@ -243,33 +243,28 @@ proc writeMultiString*(handle: RegHandle, key: string, value: openArray[string])
     {.sideEffect.} =
   ## writes value of type ``REG_MULTI_SZ`` to specified key. Empty strings are
   ## not allowed and being skipped.
-  ##
-  ## ``Warning``: chars of value > 128 (something like 世界) are not supported
-  ## and will produce invalid output.
-  var data: seq[char] = @[]
+  # each ansi string separated by \0, unicode string by \0\0
+  # last string has additional \0 or \0\0
+  var data: seq[WinChar] = @[]
   for str in items(value):
     if str == nil or len(str) == 0: continue
     var strWS = allocWinString(str)
-    var strLen = (len(strWS) + 1) * sizeof(WinChar)
-    var strBytes = cast[cstring](strWS)
-    for c in 0..strLen - 1:
-      data.add(strBytes[c])
-  for i in 0..sizeof(WinChar):
-    data.add('\0')
+    # not 0..strLen-1 because we need '\0' or '\0\0' too
+    for i in 0..len(strWS):
+      data.add(strWS[i])
+  data.add(0.WinChar) # same as '\0'
   regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regMultiSZ,
-    data[0].addr, data.len().DWORD))
+    data[0].addr, data.len().DWORD * sizeof(WinChar).DWORD))
 
 proc writeInt32*(handle: RegHandle, key: string, value: int32) {.sideEffect.} =
   ## writes value of type ``REG_DWORD`` to specified key.
-  var addrVal = value
   regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regDword,
-    addrVal.addr, sizeof(int32).DWORD))
+    value.unsafeAddr, sizeof(int32).DWORD))
 
 proc writeInt64*(handle: RegHandle, key: string, value: int64) {.sideEffect.} =
   ## writes value of type ``REG_QWORD`` to specified key.
-  var addrVal = value
   regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regQword,
-    addrVal.addr, sizeof(int64).DWORD))
+    value.unsafeAddr, sizeof(int64).DWORD))
 
 proc writeBinary*(handle: RegHandle, key: string, value: openArray[byte])
     {.sideEffect.} =
@@ -437,7 +432,7 @@ when isMainModule:
   var msg, stacktrace: string
   var h: RegHandle
   try:
-    h = create("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
+    h = createOrOpen("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
       samRead or samWrite or samWow32)
     h.writeString("strkey", "strval")
     assert(h.readString("strkey") == "strval")
@@ -453,11 +448,12 @@ when isMainModule:
     assert(h.readInt64("123x64") == 1234123412341234)
     h.writeExpandString("helloexpand", "%PATH%")
     assert(h.readExpandString("helloexpand").expandEnvString() != "%PATH%")
-    h.writeMultiString("hellomult", ["a", "b", "", nil])
+    h.writeMultiString("hellomult", ["sup!", "\u03AB世界", "世ϵ界", "", nil])
     var datmult = h.readMultiString("hellomult")
-    assert(datmult[0] == "a")
-    assert(datmult[1] == "b")
-    assert(datmult.len == 2)
+    assert(datmult[0] == "sup!")
+    assert(datmult[1] == "\u03AB世界")
+    assert(datmult[2] == "世ϵ界")
+    assert(datmult.len == 3)
     var x = create(h, "test_sk", samAll)
     assert(countSubkeys(x) == 0)
     assert(countValues(x) == 0)
