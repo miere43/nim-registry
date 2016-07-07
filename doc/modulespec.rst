@@ -1,3 +1,5 @@
+	Please do not use this module to save your applications settings, use it to interact with older programs which make use of registry, because it is slow (implemented as file system inside a file rather than database), not cross-platform, has unoblivious stuff like registry virtualization, virtual storages, different behavior across 32/64-bit systems. As alternative you can supply some kind of INI or XML file with your application or store it into platform-specific settings folder (take a look at `appdirs module <https://github.com/MrJohz/appdirs>`_).
+
 Notes
 -----
 
