@@ -285,17 +285,17 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     buff {.inject.}: pointer = alloc(size)
     kind: RegValueKind
     keyWS = allocWinString(key)
-  var returnValue = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
-    buff, size.addr)
-  if returnValue == ERROR_MORE_DATA:
-    # TODO: impl. for HKEY_PERFORMANCE_DATA
-    # size now stores amount of bytes, required to store value in array
-    buff = realloc(buff, size)
-    returnValue = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
+    status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
       buff, size.addr)
-  if returnValue != ERROR_SUCCESS:
+  if status == ERROR_MORE_DATA:
+    while status != ERROR_MORE_DATA:
+      # size now stores amount of bytes, required to store value in array
+      buff = realloc(buff, size)
+      status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
+        buff, size.addr)
+  if status != ERROR_SUCCESS:
     dealloc(buff)
-    regThrowOnFailInternal(returnValue)
+    regThrowOnFailInternal(status)
 
 proc readString*(handle: RegHandle, key: string): string {.sideEffect.} =
   ## reads value of type ``REG_SZ`` from registry key.
