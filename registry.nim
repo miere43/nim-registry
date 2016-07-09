@@ -352,12 +352,10 @@ proc readMultiString*(handle: RegHandle, key: string): seq[string]
 proc readInt32*(handle: RegHandle, key: string): int32 {.sideEffect.} =
   ## reads value of type ``REG_DWORD`` from registry key. The key must have
   ## been opened with the ``samQueryValue`` access right.
-  ## dont forget to dealloc buffer
   var
     size: DWORD = sizeof(result).DWORD
-    kind: RegValueKind
     keyWS = allocWinString(key)
-    status = regGetValue(handle, nil, keyWS, RRF_RT_REG_DWORD, kind.addr,
+    status = regGetValue(handle, nil, keyWS, RRF_RT_REG_DWORD, nil,
       result.addr, size.addr)
   if status != ERROR_SUCCESS:
     regThrowOnFailInternal(status)
@@ -367,9 +365,8 @@ proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
   ## been opened with the ``samQueryValue`` access right.
   var
     size: DWORD = sizeof(result).DWORD
-    kind: RegValueKind
     keyWS = allocWinString(key)
-    status = regGetValue(handle, nil, keyWS, RRF_RT_REG_QWORD, kind.addr,
+    status = regGetValue(handle, nil, keyWS, RRF_RT_REG_QWORD, nil,
       result.addr, size.addr)
   if status != ERROR_SUCCESS:
     regThrowOnFailInternal(status)
