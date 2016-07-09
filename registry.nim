@@ -352,22 +352,27 @@ proc readMultiString*(handle: RegHandle, key: string): seq[string]
 proc readInt32*(handle: RegHandle, key: string): int32 {.sideEffect.} =
   ## reads value of type ``REG_DWORD`` from registry key. The key must have
   ## been opened with the ``samQueryValue`` access right.
-  injectRegKeyReader(handle, key, RRF_RT_REG_DWORD)
-  var intbuff = cast[cstring](buff)
-  result = int32(byte(intbuff[0])) or (int32(byte(intbuff[1])) shl 8) or
-    (int32(byte(intbuff[2])) shl 16) or (int32(byte(intbuff[3])) shl 24)
-  dealloc(buff)
+  ## dont forget to dealloc buffer
+  var
+    size: DWORD = sizeof(result).DWORD
+    kind: RegValueKind
+    keyWS = allocWinString(key)
+    status = regGetValue(handle, nil, keyWS, RRF_RT_REG_DWORD, kind.addr,
+      result.addr, size.addr)
+  if status != ERROR_SUCCESS:
+    regThrowOnFailInternal(status)
 
 proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
   ## reads value of type ``REG_QWORD`` from registry entry. The key must have
   ## been opened with the ``samQueryValue`` access right.
-  injectRegKeyReader(handle, key, RRF_RT_REG_QWORD)
-  var intbuff = cast[cstring](buff)
-  result = int64(byte(intbuff[0])) or (int64(byte(intbuff[1])) shl 8) or
-    (int64(byte(intbuff[2])) shl 16) or (int64(byte(intbuff[3])) shl 24) or
-    (int64(byte(intbuff[4])) shl 32) or (int64(byte(intbuff[5])) shl 40) or
-    (int64(byte(intbuff[6])) shl 48) or (int64(byte(intbuff[7])) shl 56)
-  dealloc(buff)
+  var
+    size: DWORD = sizeof(result).DWORD
+    kind: RegValueKind
+    keyWS = allocWinString(key)
+    status = regGetValue(handle, nil, keyWS, RRF_RT_REG_QWORD, kind.addr,
+      result.addr, size.addr)
+  if status != ERROR_SUCCESS:
+    regThrowOnFailInternal(status)
 
 proc readBinary*(handle: RegHandle, key: string): seq[byte] {.sideEffect.} =
   ## reads value of type ``REG_BINARY`` from registry entry. The key must have
