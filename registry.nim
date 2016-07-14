@@ -20,14 +20,14 @@ proc splitRegPath(path: string, root: var string, other: var string): bool =
 
 proc getPredefinedRegHandle(strkey: string): RegHandle =
   case strkey:
-  of "HKEY_CLASSES_ROOT": return HKEY_CLASSES_ROOT
-  of "HKEY_CURRENT_USER": return HKEY_CURRENT_USER
-  of "HKEY_LOCAL_MACHINE": return HKEY_LOCAL_MACHINE
-  of "HKEY_USERS": return HKEY_USERS
-  of "HKEY_PERFORMANCE_DATA": return HKEY_PERFORMANCE_DATA
-  of "HKEY_CURRENT_CONFIG": return HKEY_CURRENT_CONFIG
-  of "HKEY_DYN_DATA": return HKEY_DYN_DATA
-  else: return 0.RegHandle
+  of "HKEY_CLASSES_ROOT": HKEY_CLASSES_ROOT
+  of "HKEY_CURRENT_USER": HKEY_CURRENT_USER
+  of "HKEY_LOCAL_MACHINE": HKEY_LOCAL_MACHINE
+  of "HKEY_USERS": HKEY_USERS
+  of "HKEY_PERFORMANCE_DATA": HKEY_PERFORMANCE_DATA
+  of "HKEY_CURRENT_CONFIG": HKEY_CURRENT_CONFIG
+  of "HKEY_DYN_DATA": HKEY_DYN_DATA
+  else: 0.RegHandle
 
 proc parseRegPath(path: string, outSubkey: var string): RegHandle =
   var rootStr: string
@@ -79,9 +79,9 @@ template injectRegPathSplit(path: string) =
 proc reallen(x: WinString): int {.inline.} =
   ## returns real string length in bytes, counts chars and terminating null.
   when declared(useWinUnicode):
-    return len(x) * 2 + 2
+    len(x) * 2 + 2
   else:
-    return len(x) + 1
+    len(x) + 1
 
 proc createKeyInternal(handle: RegHandle, subkey: string,
   samDesired: RegKeyRights, outHandle: ptr RegHandle): LONG {.sideEffect.} =
@@ -108,8 +108,8 @@ proc create*(path: string, samDesired: RegKeyRights): RegHandle {.sideEffect.} =
 
 proc createOrOpen*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
-  ## same as ``create(...)``, but does not raise ``RegistryError`` if key already
-  ## exists.
+  ## same as `create<#create,RegHandle,string,RegKeyRights>`_ proc, but does not
+  ## raise ``RegistryError`` if key already exists.
   ##
   ## .. code-block:: nim
   ##   createOrOpen(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
@@ -117,8 +117,8 @@ proc createOrOpen*(handle: RegHandle, subkey: string,
 
 proc createOrOpen*(path: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
-  ## same as ``create(...)``, but does not raise ``RegistryError`` if key already
-  ## exists.
+  ## same as `create<#create,string,RegKeyRights>`_ proc, but does not
+  ## raise ``RegistryError`` if key already exists.
   ##
   ## .. code-block:: nim
   ##   createOrOpen("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
@@ -138,7 +138,7 @@ proc open*(handle: RegHandle, subkey: string,
 
 proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
     {.sideEffect.} =
-  ## same as ``open``, but enables specifying path without using
+  ## same as `open<#open>`_ proc, but enables specifying path without using
   ## root `RegHandle`  constants.
   ##
   ## .. code-block:: nim
@@ -163,7 +163,7 @@ proc close*(handle: RegHandle) {.sideEffect.} =
   discard regCloseKey(handle)
 
 proc close*(handles: varargs[RegHandle]) {.inline, sideEffect.} =
-  ## same as ``close(...)``, but allows to close several handles at once.
+  ## same as `close<#close>`_ proc, but allows to close several handles at once.
   ##
   ## .. code-block:: nim
   ##   var h1 = open(HKEY_LOCAL_MACHINE, "Software", samRead)
@@ -301,7 +301,8 @@ proc readString*(handle: RegHandle, key: string): string {.sideEffect.} =
 proc readExpandString*(handle: RegHandle, key: string): string {.sideEffect.} =
   ## reads value of type ``REG_EXPAND_SZ`` from registry key. The key must have
   ## been opened with the ``samQueryValue`` access right.
-  ## Use `expandEnvString` proc to expand environment variables.
+  ## Use `expandEnvString<#expandEnvString>`_ proc to expand environment
+  ## variables.
   # data not supported error thrown without RRF_NOEXPAND 
   injectRegKeyReader(handle, key, RRF_RT_REG_EXPAND_SZ or RRF_NOEXPAND)
   result = $(cast[WinString](buff))
@@ -357,8 +358,7 @@ proc readInt32*(handle: RegHandle, key: string): int32 {.sideEffect.} =
     keyWS = allocWinString(key)
     status = regGetValue(handle, nil, keyWS, RRF_RT_REG_DWORD, nil,
       result.addr, size.addr)
-  if status != ERROR_SUCCESS:
-    regThrowOnFailInternal(status)
+  regThrowOnFail(status)
 
 proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
   ## reads value of type ``REG_QWORD`` from registry entry. The key must have
@@ -368,8 +368,7 @@ proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
     keyWS = allocWinString(key)
     status = regGetValue(handle, nil, keyWS, RRF_RT_REG_QWORD, nil,
       result.addr, size.addr)
-  if status != ERROR_SUCCESS:
-    regThrowOnFailInternal(status)
+  regThrowOnFail(status)
 
 proc readBinary*(handle: RegHandle, key: string): seq[byte] {.sideEffect.} =
   ## reads value of type ``REG_BINARY`` from registry entry. The key must have
@@ -385,7 +384,7 @@ proc delSubkey*(handle: RegHandle, subkey: string,
   ## view of the registry. Note that key names are not case sensitive.
   ## The subkey to be deleted must not have subkeys. To delete a key and all it
   ## subkeys, you need to enumerate the subkeys and delete them individually.
-  ## To delete keys recursively, use the ``delTree``.
+  ## To delete keys recursively, use the `delTree<#delTree>`_.
   ##
   ## `samDesired` should be ``samWow32`` or ``samWow64``.
   regThrowOnFail(regDeleteKeyEx(handle, allocWinString(subkey), samDesired,
@@ -400,8 +399,9 @@ proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
   regThrowOnFail(regDeleteTree(handle, allocWinString(subkey)))
 
 proc expandEnvString*(str: string): string =
-  ## helper proc to expand strings returned by `readExpandString`. If string
-  ## cannot be expanded, ``nil`` returned.
+  ## helper proc to expand strings returned by
+  ## `readExpandString<#readExpandString>`_ proc. If string cannot be expanded,
+  ## ``nil`` returned.
   ##
   ## .. code-block:: nim
   ##  echo expandEnvString("%PATH%") # => C:\Windows;C:\Windows\system32...

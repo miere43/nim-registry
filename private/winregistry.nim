@@ -1,7 +1,6 @@
 import dynlib, winlean
 type
   RegHandle = distinct HANDLE
-  PHKEY = ptr RegHandle
   RegValueKind* {.size: sizeof(DWORD).} = enum
     regNone = 0
     regSZ = 1
@@ -13,10 +12,8 @@ type
     regMultiSZ = 7
     regQword = 11
   RegKeyRights* {.size: sizeof(int32).} = enum ## represents Windows Registry 
-                                               ## Key Security and Access Rights
-                                               ## values. Security rights 
-                                               ## inherit from parent keys.
-                                               ## Can be combined.
+    ## Key Security and Access Rights values.
+    ## Security rights inherit from parent keys. Can be combined.
     samDefault = 0
     samQueryValue = 1
     samSetValue = 2
@@ -44,20 +41,19 @@ type
 
 proc `==`*(x, y: RegHandle): bool {.inline.} =
   ## the ``==`` operator for ``RegHandle``.
-  result = ord(x) == ord(y)
+  ord(x) == ord(y)
 
 proc `!=`*(x, y: RegHandle): bool {.inline.} =
   ## the ``!=`` operator for ``RegHandle``
-  result = not (x == y)
+  not (x == y)
 
 proc `or`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
   ## the ``or`` operator for ``RegKeyRights``.
-  result = RegKeyRights(ord(a) or ord(b))
+  RegKeyRights(ord(a) or ord(b))
 
 proc `|`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
-  ## alias of ``or`` for ``RegKeyRights``.
-  result = a or b
-
+  ## alias for ``or`` for ``RegKeyRights``.
+  a or b
 
 when useWinUnicode:
   type WinString* = WideCString ## ``cstring`` when ``useWinAscii`` 
@@ -78,11 +74,8 @@ const
   HKEY_PERFORMANCE_DATA*: RegHandle = 0x80000004.RegHandle
   HKEY_CURRENT_CONFIG*: RegHandle = 0x80000005.RegHandle
   HKEY_DYN_DATA*: RegHandle = 0x80000006.RegHandle
-  #KEY_ALL_ACCESS = 0xF003F
 
   REG_CREATED_NEW_KEY = 0x00000001.LONG
-  # REG_OPENED_EXISTING_KEY = 0x00000002.LONG
-
   ERROR_SUCCESS = 0x0.LONG
   ERROR_MORE_DATA = 234.LONG
   ERROR_NO_MORE_ITEMS = 259.LONG
@@ -100,16 +93,12 @@ proc regCloseKey(handle: RegHandle): LONG
 
 proc regOpenCurrentUser(samDesired: RegKeyRights,
   phkResult: ptr RegHandle): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegOpenCurrentUser".}
+  {.stdcall, dynlib: "advapi32", importc: "RegOpenCurrentUser".}
 
 when useWinUnicode:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
-    samDesired: RegKeyRights, phkResult: PHKEY): LONG
+    samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExW".}
-
-  # proc regSetKeyValue(handle: RegHandle, lpSubKey, lpValueName: WinString,
-  #   dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
-  #   {.stdcall, dynlib: "advapi32", importc: "RegSetKeyValueW".}
 
   proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WinString,
     dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
@@ -150,12 +139,8 @@ when useWinUnicode:
     {.stdcall, dynlib: "kernel32", importc: "RegQueryInfoKeyW".}
 else:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
-    samDesired: RegKeyRights, phkResult: PHKEY): LONG
+    samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExA".}
-
-  # proc regSetKeyValue(handle: RegHandle, lpSubKey, lpValueName: WinString,
-  #   dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
-  #   {.stdcall, dynlib: "advapi32", importc: "RegSetKeyValueA".}
 
   proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WinString,
     dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
