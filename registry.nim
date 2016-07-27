@@ -1,10 +1,10 @@
 ## This module contains procedures that provide access to Windows Registry.
 ##
-## .. include:: doc/modulespec.rst 
+## .. include:: doc/modulespec.rst
 include "private/winregistry"
 
 type
-  RegistryError* = object of Exception ## raised when registry-related 
+  RegistryError* = object of Exception ## raised when registry-related
                                        ## error occurs.
 
 proc splitRegPath(path: string, root: var string, other: var string): bool =
@@ -97,7 +97,7 @@ proc create*(handle: RegHandle, subkey: string,
   if createKeyInternal(handle, subkey, samDesired, result.addr) !=
       REG_CREATED_NEW_KEY:
     raise newException(RegistryError, "key already exists")
-  
+
 proc create*(path: string, samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
   ##
@@ -144,7 +144,7 @@ proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
   ## .. code-block:: nim
   ##   open("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
   injectRegPathSplit(path)
-  result = open(root, subkey, samDesired) 
+  result = open(root, subkey, samDesired)
 
 proc openCurrentUser*(samDesired: RegKeyRights = samDefault): RegHandle
   {.sideEffect.} =
@@ -222,7 +222,7 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
       regThrowOnFailInternal(returnValue)
       break
 
-proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} = 
+proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} =
   ## writes value of type ``REG_SZ`` to specified key. String-literal values
   ## must be formatted using a backslash preceded by another backslash as an
   ## escape character.
@@ -303,7 +303,7 @@ proc readExpandString*(handle: RegHandle, key: string): string {.sideEffect.} =
   ## been opened with the ``samQueryValue`` access right.
   ## Use `expandEnvString<#expandEnvString>`_ proc to expand environment
   ## variables.
-  # data not supported error thrown without RRF_NOEXPAND 
+  # data not supported error thrown without RRF_NOEXPAND
   injectRegKeyReader(handle, key, RRF_RT_REG_EXPAND_SZ or RRF_NOEXPAND)
   result = $(cast[WinString](buff))
   dealloc(buff)
@@ -406,7 +406,7 @@ proc expandEnvString*(str: string): string =
   ## .. code-block:: nim
   ##  echo expandEnvString("%PATH%") # => C:\Windows;C:\Windows\system32...
   var
-    size: Natural = 32 * sizeof(WinChar)
+    size: DWORD = 32 * sizeof(WinChar)
     buff: pointer = alloc(size)
     valueWS = allocWinString(str)
   var returnValue = expandEnvironmentStrings(valueWS, buff, size)
