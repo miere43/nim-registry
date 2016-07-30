@@ -11,7 +11,7 @@ type
     regLink = 6
     regMultiSZ = 7
     regQword = 11
-  RegKeyRights* {.size: sizeof(int32).} = enum ## represents Windows Registry 
+  RegKeyRights* {.size: sizeof(int32).} = enum ## represents Windows Registry
     ## Key Security and Access Rights values.
     ## Security rights inherit from parent keys. Can be combined.
     samDefault = 0
@@ -26,7 +26,7 @@ type
     samDelete = 65536
     samReadControl = 131072
     # combines ``samReadControl``, ``samSetValue``, ``samCreateSubkey``
-    samWrite = 131078 
+    samWrite = 131078
     # combines ``samReadControl``, ``samQueryValue``, ``samEnumSubkeys``,
     # ``samNotify``
     samRead = 131097
@@ -56,10 +56,10 @@ proc `|`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
   a or b
 
 when useWinUnicode:
-  type WinString* = WideCString ## ``cstring`` when ``useWinAscii`` 
+  type WinString* = WideCString ## ``cstring`` when ``useWinAscii``
                                 ## is declared or  ``WideCString`` otherwise.
 else:
-  type WinString* = cstring ## ``cstring`` when ``useWinAscii`` 
+  type WinString* = cstring ## ``cstring`` when ``useWinAscii``
                             ## is declared or  ``WideCString`` otherwise.
 
 const

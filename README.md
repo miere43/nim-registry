@@ -10,7 +10,7 @@ import registry
 var
   faceName: string
   fontSize: int32
-  fontWeight: int32 
+  fontWeight: int32
   h: RegHandle
 
 try:
