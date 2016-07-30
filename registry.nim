@@ -406,7 +406,7 @@ proc expandEnvString*(str: string): string =
   ## .. code-block:: nim
   ##  echo expandEnvString("%PATH%") # => C:\Windows;C:\Windows\system32...
   var
-    size: Natural = 32 * sizeof(WinChar)
+    size: DWORD = 32 * sizeof(WinChar)
     buff: pointer = alloc(size)
     valueWS = allocWinString(str)
   var returnValue = expandEnvironmentStrings(valueWS, buff, size)

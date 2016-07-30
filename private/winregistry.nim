@@ -1,6 +1,6 @@
 import dynlib, winlean
 type
-  RegHandle = distinct HANDLE
+  RegHandle* = distinct HANDLE
   RegValueKind* {.size: sizeof(DWORD).} = enum
     regNone = 0
     regSZ = 1
