@@ -223,9 +223,7 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
       break
 
 proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} =
-  ## writes value of type ``REG_SZ`` to specified key. String-literal values
-  ## must be formatted using a backslash preceded by another backslash as an
-  ## escape character.
+  ## writes value of type ``REG_SZ`` to specified key.
   ##
   ## .. code-block:: nim
   ##   writeString(handle, "hello", "world")
@@ -292,20 +290,21 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     dealloc(buff)
     regThrowOnFailInternal(status)
 
-proc readString*(handle: RegHandle, key: string): string {.sideEffect.} =
+proc readString*(handle: RegHandle, key: string): TaintedString {.sideEffect.} =
   ## reads value of type ``REG_SZ`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_SZ)
-  result = $(cast[WinString](buff))
+  result = TaintedString($(cast[WinString](buff)))
   dealloc(buff)
 
-proc readExpandString*(handle: RegHandle, key: string): string {.sideEffect.} =
+proc readExpandString*(handle: RegHandle, key: string): TaintedString
+    {.sideEffect.} =
   ## reads value of type ``REG_EXPAND_SZ`` from registry key. The key must have
   ## been opened with the ``samQueryValue`` access right.
   ## Use `expandEnvString<#expandEnvString>`_ proc to expand environment
   ## variables.
   # data not supported error thrown without RRF_NOEXPAND
   injectRegKeyReader(handle, key, RRF_RT_REG_EXPAND_SZ or RRF_NOEXPAND)
-  result = $(cast[WinString](buff))
+  result = TaintedString($(cast[WinString](buff)))
   dealloc(buff)
 
 proc readMultiString*(handle: RegHandle, key: string): seq[string]
@@ -429,6 +428,11 @@ proc expandEnvString*(str: string): string =
   result = $(cast[WinString](buff))
   dealloc(buff)
 
+when compileOption("taintmode"):
+  proc expandEnvString*(str: TaintedString): string =
+    ## expandEnvString for TaintedString.
+    expandEnvString(str.string)
+
 when isMainModule:
   var pass: bool = true
   var msg, stacktrace: string
@@ -437,9 +441,9 @@ when isMainModule:
     h = createOrOpen("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
       samRead or samWrite or samWow32)
     h.writeString("strkey", "strval")
-    assert(h.readString("strkey") == "strval")
+    assert(string(h.readString("strkey")) == "strval")
     h.writeString("path", "C:\\dir\\myfile")
-    assert h.readString("path") == "C:\\dir\\myfile"
+    assert h.readString("path").string == "C:\\dir\\myfile"
     h.writeBinary("hello", [0xff.byte, 0x00])
     var dat = h.readBinary("hello")
     assert(dat[0] == 0xff)
