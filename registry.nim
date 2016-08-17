@@ -198,9 +198,9 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
   var
     index = 0.DWORD
     sizeChars = queryMaxKeyLength(handle) + 1
-    numCharsReaded = sizeChars
     buff = alloc(sizeChars * sizeof(WinChar))
   while true:
+    var numCharsReaded = sizeChars
     var returnValue = regEnumKeyEx(handle, index, cast[WinString](buff),
       numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WinString](0),
       cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
