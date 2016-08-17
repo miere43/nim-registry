@@ -197,24 +197,25 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
   ## The key must have been opened with the ``samQueryValue`` access right.
   var
     index = 0.DWORD
-    sizeChars = queryMaxKeyLength(handle) + 1
-    numCharsReaded = sizeChars
+    # include terminating NULL:
+    sizeChars = handle.queryMaxKeyLength + 1
     buff = alloc(sizeChars * sizeof(WinChar))
+
   while true:
+    var numCharsReaded = sizeChars
     var returnValue = regEnumKeyEx(handle, index, cast[WinString](buff),
       numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WinString](0),
       cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
-    # if returnValue == ERROR_MORE_DATA:
-    #   # numCharsReaded now stores num of chars required to store string
-    #   # WITHOUT TERMINATING NULL CHAR. stupid winapi T_T
-    #   echo "realloc, ", sizeChars, " -> ", numCharsReaded + 1
-    #   sizeChars = numCharsReaded + 1
+
+    case returnValue
+    # of ERROR_MORE_DATA:
+    #   sizeChars += 10
     #   buff = realloc(buff, sizeChars * sizeof(WinChar))
     #   continue
-    if returnValue == ERROR_NO_MORE_ITEMS:
+    of ERROR_NO_MORE_ITEMS:
       dealloc(buff)
       break;
-    if returnValue in {ERROR_MORE_DATA, ERROR_SUCCESS}:
+    of ERROR_SUCCESS:
       yield $(cast[WinString](buff))
       inc index
     else:
@@ -281,11 +282,10 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
       buff, size.addr)
   if status == ERROR_MORE_DATA:
-    while status != ERROR_MORE_DATA:
-      # size now stores amount of bytes, required to store value in array
-      buff = realloc(buff, size)
-      status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
-        buff, size.addr)
+    # size now stores amount of bytes, required to store value in array
+    buff = realloc(buff, size)
+    status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
+      buff, size.addr)
   if status != ERROR_SUCCESS:
     dealloc(buff)
     regThrowOnFailInternal(status)
