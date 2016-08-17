@@ -282,11 +282,10 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
       buff, size.addr)
   if status == ERROR_MORE_DATA:
-    while status != ERROR_MORE_DATA:
-      # size now stores amount of bytes, required to store value in array
-      buff = realloc(buff, size)
-      status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
-        buff, size.addr)
+    # size now stores amount of bytes, required to store value in array
+    buff = realloc(buff, size)
+    status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
+      buff, size.addr)
   if status != ERROR_SUCCESS:
     dealloc(buff)
     regThrowOnFailInternal(status)
