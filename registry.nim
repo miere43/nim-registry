@@ -208,10 +208,6 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
       cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
 
     case returnValue
-    # of ERROR_MORE_DATA:
-    #   sizeChars += 10
-    #   buff = realloc(buff, sizeChars * sizeof(WinChar))
-    #   continue
     of ERROR_NO_MORE_ITEMS:
       dealloc(buff)
       break;

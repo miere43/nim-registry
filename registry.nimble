@@ -1,6 +1,6 @@
 [Package]
 name        = "registry"
-version     = "0.1.5"
+version     = "0.1.6"
 author      = "Vladislav <miere> Vorobiev"
 description = "Deal with Windows Registry from Nim"
 license     = "MIT"
