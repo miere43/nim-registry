@@ -4,5 +4,5 @@ author      = "Vladislav <miere> Vorobiev"
 description = "Deal with Windows Registry from Nim"
 license     = "MIT"
 
-# deps
+# deps 
 requires      "nim >= 0.14.0"
