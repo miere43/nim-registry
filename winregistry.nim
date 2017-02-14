@@ -2,7 +2,7 @@
 ##
 ## .. include:: doc/modulespec.rst
 
-import dynlib, winlean, threadpool
+import dynlib, winlean
 type
   RegHandle* = distinct HANDLE
   RegValueKind* {.size: sizeof(DWORD).} = enum
