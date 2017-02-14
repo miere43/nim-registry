@@ -1,5 +1,5 @@
 # package
-version     = "0.1.7"
+version     = "0.1.8"
 author      = "Vladislav <miere> Vorobiev"
 description = "Deal with Windows Registry from Nim"
 license     = "MIT"
