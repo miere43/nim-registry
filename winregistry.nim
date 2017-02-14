@@ -2,7 +2,7 @@
 ##
 ## .. include:: doc/modulespec.rst
 
-import dynlib, winlean
+import dynlib, winlean, threadpool
 type
   RegHandle* = distinct HANDLE
   RegValueKind* {.size: sizeof(DWORD).} = enum
@@ -68,7 +68,6 @@ else:
 
 const
   nullDwordPtr: ptr DWORD = cast[ptr DWORD](0)
-let nullWinString: WinString = cast[WinString](0)
 
 const
   HKEY_CLASSES_ROOT*: RegHandle = 0x80000000.RegHandle
@@ -354,7 +353,7 @@ proc close*(handles: varargs[RegHandle]) {.inline, sideEffect.} =
     close(handle)
 
 proc queryMaxKeyLength(handle: RegHandle): DWORD {.sideEffect.} =
-  regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
     nullDwordPtr, nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
@@ -362,14 +361,14 @@ proc countValues*(handle: RegHandle): int32 {.sideEffect.} =
   ## returns number of key-value pairs that are associated with the
   ## specified registry key. Does not count default key-value pair.
   ## The key must have been opened with the ``samQueryValue`` access right.
-  regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr, result.addr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
 proc countSubkeys*(handle: RegHandle): int32 {.sideEffect.} =
   ## returns number of subkeys that are contained by the specified registry key.
   ## The key must have been opened with the ``samQueryValue`` access right.
-  regThrowOnFail(regQueryInfoKey(handle, nullWinString, nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
     nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr, nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
@@ -643,9 +642,7 @@ when isMainModule:
     close(x)
     h.delSubkey("test_sk")
     close(h)
-    HKEY_LOCAL_MACHINE.delSubkey("Software\\AAAnim_reg_test", samWow32)
-    #for sk in enumSubkeys(h):
-    #  echo sk
+    delSubkey(HKEY_LOCAL_MACHINE, "Software\\AAAnim_reg_test", samWow32)
   except RegistryError, AssertionError:
     pass = false
     msg = getCurrentExceptionMsg()
