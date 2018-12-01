@@ -219,7 +219,7 @@ proc parseRegPath(path: string, outSubkey: var string): RegHandle =
 
 proc allocWinString(str: string): WinString {.inline.} =
   when useWinUnicode:
-    if str == nil:
+    if str.len == 0:
       return WideCString(nil)
     return newWideCString(str)
   else:
@@ -230,7 +230,7 @@ proc regThrowOnFailInternal(hresult: LONG): void =
     const langid = 1033 # show english error msgs
   else:
     const langid = 0
-  var result: string = nil
+  var result: string
   when useWinUnicode:
     var msgbuf: WideCString
     if formatMessageW(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
@@ -243,7 +243,7 @@ proc regThrowOnFailInternal(hresult: LONG): void =
                     nil, hresult.int32, langid, msgbuf.addr, 0, nil) != 0'i32:
       result = $msgbuf
       if msgbuf != nil: localFree(msgbuf)
-  if result == nil:
+  if result.len == 0:
     raise newException(RegistryError, "unknown error")
   else:
     raise newException(RegistryError, result)
@@ -422,7 +422,7 @@ proc writeMultiString*(handle: RegHandle, key: string, value: openArray[string])
   # last string has additional \0 or \0\0
   var data: seq[WinChar] = @[]
   for str in items(value):
-    if str == nil or len(str) == 0: continue
+    if str.len == 0: continue
     var strWS = allocWinString(str)
     # not 0..strLen-1 because we need '\0' or '\0\0' too
     for i in 0..len(strWS):
@@ -587,7 +587,7 @@ proc expandEnvString*(str: string): string =
   var returnValue = expandEnvironmentStrings(valueWS, buff, size)
   if returnValue == 0:
     dealloc(buff)
-    return nil
+    return ""
   # return value is in TCHARs, aka number of chars returned, not number of
   # bytes required to store string
   # WinChar is `char` or `Utf16Char` depending on useWinUnicode const in winlean
@@ -600,7 +600,7 @@ proc expandEnvString*(str: string): string =
     returnValue = expandEnvironmentStrings(valueWS, buff, size)
   if returnValue == 0:
     dealloc(buff)
-    return nil
+    return ""
   result = $(cast[WinString](buff))
   dealloc(buff)
 
