@@ -1,8 +1,8 @@
 # package
-version     = "0.1.8"
+version     = "0.2.0"
 author      = "Vladislav <miere> Vorobiev"
 description = "Deal with Windows Registry from Nim"
 license     = "MIT"
 
 # deps 
-requires      "nim >= 0.14.0"
+requires      "nim >= 0.19.0"

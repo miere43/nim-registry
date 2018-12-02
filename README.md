@@ -27,7 +27,7 @@ finally:
 ## Tests
 Run in command line:
 ```
-$ nim c -r registry.nim
-$ nim c -r -d:useWinAnsi registry.nim
+$ nim c -r winregistry
+$ nim c -r -d:useWinAnsi winregistry
 ```
 You should see a "tests passed" message.

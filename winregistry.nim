@@ -630,7 +630,7 @@ when isMainModule:
     assert(h.readInt64("123x64") == 1234123412341234)
     h.writeExpandString("helloexpand", "%PATH%")
     assert(h.readExpandString("helloexpand").expandEnvString() != "%PATH%")
-    h.writeMultiString("hellomult", ["sup!", "\u03AB世界", "世ϵ界", "", nil])
+    h.writeMultiString("hellomult", ["sup!", "\u03AB世界", "世ϵ界", ""])
     var datmult = h.readMultiString("hellomult")
     assert(datmult.len == 3)
     assert(datmult[0] == "sup!")
