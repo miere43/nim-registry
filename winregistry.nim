@@ -132,14 +132,19 @@ when useWinUnicode:
   proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WinString,
     lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WinString,
     lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "kernel32", importc: "RegEnumKeyExW".}
+    {.stdcall, dynlib: "advapi32", importc: "RegEnumKeyExW".}
+
+  proc regEnumValue(hKey: RegHandle, dwIndex: DWORD, lpValueName: WinString,
+    lpcchValueName: ptr DWORD, lpReserved: ptr DWORD, lpType: ptr DWORD,
+    lpData: ptr uint8, lpcbData: ptr DWORD): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegEnumValueW".}
 
   proc regQueryInfoKey(hKey: RegHandle, lpClass: WinString, lpcClass: ptr DWORD,
     lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
     lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
     lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
     lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "kernel32", importc: "RegQueryInfoKeyW".}
+    {.stdcall, dynlib: "advapi32", importc: "RegQueryInfoKeyW".}
 else:
   proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
     samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
@@ -174,14 +179,19 @@ else:
   proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WinString,
     lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WinString,
     lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "kernel32", importc: "RegEnumKeyExA".}
+    {.stdcall, dynlib: "advapi32", importc: "RegEnumKeyExA".}
+
+  proc regEnumValue(hKey: RegHandle, dwIndex: DWORD, lpValueName: WinString,
+    lpcchValueName: ptr DWORD, lpReserved: ptr DWORD, lpType: ptr DWORD,
+    lpData: ptr uint8, lpcbData: ptr DWORD): LONG
+    {.stdcall, dynlib: "advapi32", importc: "RegEnumValueA".}
 
   proc regQueryInfoKey(hKey: RegHandle, lpClass: WinString, lpcClass: ptr DWORD,
     lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
     lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
     lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
     lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "kernel32", importc: "RegQueryInfoKeyA".}
+    {.stdcall, dynlib: "advapi32", importc: "RegQueryInfoKeyA".}
 
 type
   RegistryError* = object of Exception ## raised when registry-related
@@ -219,8 +229,6 @@ proc parseRegPath(path: string, outSubkey: var string): RegHandle =
 
 proc allocWinString(str: string): WinString {.inline.} =
   when useWinUnicode:
-    if str.len == 0:
-      return WideCString(nil)
     return newWideCString(str)
   else:
     return cstring(str)
@@ -340,7 +348,8 @@ proc close*(handle: RegHandle) {.sideEffect.} =
   ## .. code-block:: nim
   ##   var h = open(HKEY_LOCAL_MACHINE, "Software", samRead)
   ##   close(h)
-  discard regCloseKey(handle)
+  if handle != 0.RegHandle:
+    discard regCloseKey(handle)
 
 proc close*(handles: varargs[RegHandle]) {.inline, sideEffect.} =
   ## same as `close<#close>`_ proc, but allows to close several handles at once.
@@ -356,6 +365,11 @@ proc queryMaxKeyLength(handle: RegHandle): DWORD {.sideEffect.} =
   regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
     nullDwordPtr, nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
+
+proc queryMaxValueNameLength(handle: RegHandle): DWORD {.sideEffect.} =
+  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
+    nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr,
+    result.addr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
 proc countValues*(handle: RegHandle): int32 {.sideEffect.} =
   ## returns number of key-value pairs that are associated with the
@@ -375,29 +389,63 @@ proc countSubkeys*(handle: RegHandle): int32 {.sideEffect.} =
 iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
   ## enumerates through each subkey of the specified registry key.
   ## The key must have been opened with the ``samQueryValue`` access right.
-  var
-    index = 0.DWORD
-    # include terminating NULL:
-    sizeChars = handle.queryMaxKeyLength + 1
-    buff = alloc(sizeChars * sizeof(WinChar))
+  var keyBuffer: pointer = nil
 
-  while true:
-    var numCharsReaded = sizeChars
-    var returnValue = regEnumKeyEx(handle, index, cast[WinString](buff),
-      numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WinString](0),
-      cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
+  try:
+    var
+      index = 0.DWORD
+      # include terminating NULL:
+      sizeChars = handle.queryMaxKeyLength + 1
+    keyBuffer = alloc(sizeChars * sizeof(WinChar))
 
-    case returnValue
-    of ERROR_NO_MORE_ITEMS:
-      dealloc(buff)
-      break;
-    of ERROR_SUCCESS:
-      yield $(cast[WinString](buff))
-      inc index
-    else:
-      dealloc(buff)
-      regThrowOnFailInternal(returnValue)
-      break
+    while true:
+      var numCharsReaded = sizeChars
+      var returnValue = regEnumKeyEx(handle, index, cast[WinString](keyBuffer),
+        numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WinString](0),
+        cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
+
+      case returnValue
+      of ERROR_NO_MORE_ITEMS:
+        break
+      of ERROR_SUCCESS:
+        yield $(cast[WinString](keyBuffer))
+        inc index
+      else:
+        regThrowOnFailInternal(returnValue)
+        break
+  finally:
+    if keyBuffer != nil:
+      dealloc(keyBuffer)
+
+iterator enumValueNames*(handle: RegHandle): string {.sideEffect.} = 
+  ## enumerates the value names for the specified registry key. 
+  ## The key must have been opened with the ``samQueryValue`` access right.
+  var nameBuffer: pointer = nil
+
+  try:
+    var
+      index = 0.DWORD
+      maxValueNameLength = (handle.queryMaxValueNameLength() + 1).DWORD
+    nameBuffer = alloc(maxValueNameLength * sizeof(WinChar))
+
+    while true:
+      var numCharsReaded = maxValueNameLength
+      var status = regEnumValue(handle, index, cast[WinString](nameBuffer), 
+        numCharsReaded.addr, nullDwordPtr, nullDwordPtr, cast[ptr uint8](0),
+        nullDwordPtr)
+
+      case status
+      of ERROR_NO_MORE_ITEMS:
+        break
+      of ERROR_SUCCESS:
+        yield $(cast[WinString](nameBuffer))
+        inc index
+      else:
+        regThrowOnFailInternal(status)
+        break
+  finally:
+    if nameBuffer != nil:
+      dealloc(nameBuffer)
 
 proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} =
   ## writes value of type ``REG_SZ`` to specified key.
@@ -571,12 +619,14 @@ proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
   ##
   ## The key must have been opened with ``samDelete``, ``samEnumSubkeys``
   ## and ``samQueryValue`` access rights.
-  regThrowOnFail(regDeleteTree(handle, allocWinString(subkey)))
+  let winSubkey = if subkey.len == 0: cast[WinString](nil) 
+                  else: allocWinString(subkey)
+  regThrowOnFail(regDeleteTree(handle, winSubkey))
 
 proc expandEnvString*(str: string): string =
   ## helper proc to expand strings returned by
   ## `readExpandString<#readExpandString>`_ proc. If string cannot be expanded,
-  ## ``nil`` returned.
+  ## empty string is returned.
   ##
   ## .. code-block:: nim
   ##  echo expandEnvString("%PATH%") # => C:\Windows;C:\Windows\system32...
@@ -610,46 +660,94 @@ when compileOption("taintmode"):
     expandEnvString(str.string)
 
 when isMainModule:
-  var pass: bool = true
+  import sequtils
+
+  var passed = true
   var msg, stacktrace: string
-  var h: RegHandle
+  var handle, innerHandle: RegHandle
   try:
-    h = createOrOpen("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
+    handle = createOrOpen("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
       samRead or samWrite or samWow32)
-    h.writeString("strkey", "strval")
-    assert(string(h.readString("strkey")) == "strval")
-    h.writeString("path", "C:\\dir\\myfile")
-    assert h.readString("path").string == "C:\\dir\\myfile"
-    h.writeBinary("hello", [0xff.byte, 0x00])
-    var dat = h.readBinary("hello")
-    assert(dat[0] == 0xff)
-    assert(dat[1] == 0x00)
-    h.writeInt32("123x86", 12341234)
-    assert(h.readInt32("123x86") == 12341234)
-    h.writeInt64("123x64", 1234123412341234)
-    assert(h.readInt64("123x64") == 1234123412341234)
-    h.writeExpandString("helloexpand", "%PATH%")
-    assert(h.readExpandString("helloexpand").expandEnvString() != "%PATH%")
-    h.writeMultiString("hellomult", ["sup!", "\u03AB世界", "世ϵ界", ""])
-    var datmult = h.readMultiString("hellomult")
-    assert(datmult.len == 3)
-    assert(datmult[0] == "sup!")
-    assert(datmult[1] == "\u03AB世界")
-    assert(datmult[2] == "世ϵ界")
-    var x = create(h, "test_sk", samAll)
-    assert(countSubkeys(x) == 0)
-    assert(countValues(x) == 0)
-    close(x)
-    h.delSubkey("test_sk")
-    close(h)
-    delSubkey(HKEY_LOCAL_MACHINE, "Software\\AAAnim_reg_test", samWow32)
+
+    # String
+    handle.writeString("StringValue", "StringData")
+    assert(handle.readString("StringValue").string == "StringData")
+    handle.writeString("StringPathValue", "C:\\Dir\\File")
+    assert(handle.readString("StringPathValue").string == "C:\\Dir\\File")
+    
+    # Binary
+    handle.writeBinary("BinaryValue", [0xff.byte, 0x00])
+    let binaryData = handle.readBinary("BinaryValue")
+    assert(binaryData[0] == 0xff)
+    assert(binaryData[1] == 0x00)
+    
+    # Int32
+    handle.writeInt32("Int32Value", 1000)
+    assert(handle.readInt32("Int32Value") == 1000)
+    handle.writeInt32("Int32ValueMin", -2147483647)
+    assert(handle.readInt32("Int32ValueMin") == -2147483647)
+    handle.writeInt32("Int32ValueMax", 2147483647)
+    assert(handle.readInt32("Int32ValueMax") == 2147483647)
+
+    # Int64
+    handle.writeInt64("Int64Value", 1000)
+    assert(handle.readInt64("Int64Value") == 1000)
+    handle.writeInt64("Int64ValueMin", -9223372036854775807)
+    assert(handle.readInt64("Int64ValueMin") == -9223372036854775807)
+    handle.writeInt64("Int64ValueMax", 9223372036854775807)
+    assert(handle.readInt64("Int64ValueMax") == 9223372036854775807)
+
+    # Expand String
+    handle.writeExpandString("ExpandStringValue", "%PATH%")
+    assert(handle.readExpandString("ExpandStringValue").expandEnvString() != "%PATH%")
+
+    # Multi String
+    handle.writeMultiString("MultiStringValue", ["Hello, world!", "\u03AB世界", "世ϵ界", ""])
+    var multiString = handle.readMultiString("MultiStringValue")
+    assert(multiString.len == 3)
+    assert(multiString[0] == "Hello, world!")
+    assert(multiString[1] == "\u03AB世界")
+    assert(multiString[2] == "世ϵ界")
+
+    # Key/subkey/value operations
+    innerHandle = create(handle, "InnerKey", samAll)
+    assert(innerHandle.countSubkeys() == 0)
+    var numValues = innerHandle.countValues() 
+    assert(numValues == 0)
+    assert(numValues == toSeq(innerHandle.enumValueNames()).len)
+
+    innerHandle.writeString("InnerStringValue", "Hello")
+    numValues = innerHandle.countValues()
+    var valueNames = toSeq(innerHandle.enumValueNames())
+    assert(numValues == 1)
+    assert(numValues == valueNames.len)
+    assert(valueNames[0] == "InnerStringValue")
+
+    close(innerHandle)
+
+    assert(handle.countSubkeys() == 1)
+    innerHandle = create(handle, "InnerKey_second", samAll)
+    close(innerHandle)
+    innerHandle = 0.RegHandle
+
+    assert(handle.countSubkeys() == 2)
+    delSubkey(handle, "InnerKey")
+    assert(handle.countSubkeys() == 1)
+    delTree(handle, "")
+    assert(handle.countSubkeys() == 0)
+
+    close(handle)
+    handle = 0.RegHandle
+
+    # delSubkey(HKEY_LOCAL_MACHINE, "Software\\AAAnim_reg_test", samWow32)
   except RegistryError, AssertionError:
-    pass = false
+    passed = false
     msg = getCurrentExceptionMsg()
     stacktrace = getStackTrace(getCurrentException())
   finally:
-    close(h)
-    if pass:
+    close(handle)
+    close(innerHandle)
+    if passed:
       echo "tests passed"
       quit(QuitSuccess)
     else:

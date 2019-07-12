@@ -31,3 +31,14 @@ $ nim c -r winregistry
 $ nim c -r -d:useWinAnsi winregistry
 ```
 You should see a "tests passed" message.
+
+## Changelog
+### 0.2.1
+- Added "enumValueNames"
+- Fixed missing dealloc in case of exception in "enumSubkeys"
+
+### 0.2.0
+- Updated for nim 0.19.0
+
+### 0.1.8
+- Fixed GC-unsafe procs to be safe
