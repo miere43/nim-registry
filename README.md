@@ -18,7 +18,7 @@ try:
   faceName = h.readString("FaceName")
   fontSize = h.readInt32("FontSize")
   fontWeight = h.readInt32("FontWeight")
-except RegistryError:
+except OSError:
   echo "err: ", getCurrentExceptionMsg()
 finally:
   close(h)
