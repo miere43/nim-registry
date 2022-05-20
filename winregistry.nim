@@ -2,46 +2,50 @@
 ##
 ## .. include:: doc/modulespec.rst
 
-import dynlib, winlean
+import winlean
 type
-  RegHandle* = distinct HANDLE
-  RegValueKind* {.size: sizeof(DWORD).} = enum
-    regNone = 0
-    regSZ = 1
-    regExpandSZ = 2
-    regBinary = 3
-    regDword = 4
-    regDwordBE = 5
-    regLink = 6
-    regMultiSZ = 7
-    regQword = 11
-  RegKeyRights* {.size: sizeof(int32).} = enum ## represents Windows Registry
+  RegHandle* = distinct uint
+  RegValueKind* = distinct uint32
+  RegKeyRights* = distinct uint32 ## represents Windows Registry
     ## Key Security and Access Rights values.
     ## Security rights inherit from parent keys. Can be combined.
-    samDefault = 0
-    samQueryValue = 1
-    samSetValue = 2
-    samCreateSubkey = 4
-    samEnumSubkeys = 8
-    samNotify = 16
-    samCreateLink = 32
-    samWow64 = 256
-    samWow32 = 512
-    samDelete = 65536
-    samReadControl = 131072
-    # combines ``samReadControl``, ``samSetValue``, ``samCreateSubkey``
-    samWrite = 131078
-    # combines ``samReadControl``, ``samQueryValue``, ``samEnumSubkeys``,
-    # ``samNotify``
-    samRead = 131097
-    samWriteDac = 262144
-    samWriteOwner = 524288
-    # combines everything except ``samWow32`` and ``samWow64``
-    samAll = 983103
   SecurityAttributes {.final, pure.} = object
     nLength: DWORD
     lpSecurityDescriptor: pointer
     bInheritHandle: WINBOOL
+
+const
+  regNone* = RegValueKind(0)
+  regSZ* = RegValueKind(1)
+  regExpandSZ* = RegValueKind(2)
+  regBinary* = RegValueKind(3)
+  regDword* = RegValueKind(4)
+  regDwordBE* = RegValueKind(5)
+  regLink* = RegValueKind(6)
+  regMultiSZ* = RegValueKind(7)
+  regQword* = RegValueKind(11)
+
+const
+  samDefault* = RegKeyRights(0)
+  samQueryValue* = RegKeyRights(1)
+  samSetValue* = RegKeyRights(2)
+  samCreateSubkey* = RegKeyRights(4)
+  samEnumSubkeys* = RegKeyRights(8)
+  samNotify* = RegKeyRights(16)
+  samCreateLink* = RegKeyRights(32)
+  samWow64* = RegKeyRights(256)
+  samWow32* = RegKeyRights(512)
+  samDelete* = RegKeyRights(65536)
+  samReadControl* = RegKeyRights(131072)
+  # combines ``samReadControl``, ``samSetValue``, ``samCreateSubkey``
+  samWrite* = RegKeyRights(131078)
+  # combines ``samReadControl``, ``samQueryValue``, ``samEnumSubkeys``,
+  # ``samNotify``
+  samRead* = RegKeyRights(131097)
+  samWriteDac* = RegKeyRights(262144)
+  samWriteOwner* = RegKeyRights(524288)
+  # combines everything except ``samWow32`` and ``samWow64``
+  samAll* = RegKeyRights(983103)
 
 proc `==`*(x, y: RegHandle): bool {.inline.} =
   ## the ``==`` operator for ``RegHandle``.
@@ -193,10 +197,6 @@ else:
     lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
     {.stdcall, dynlib: "advapi32", importc: "RegQueryInfoKeyA".}
 
-type
-  RegistryError* = object of Exception ## raised when registry-related
-                                       ## error occurs.
-
 proc splitRegPath(path: string, root: var string, other: var string): bool =
   var sliceEnd = 0
   for c in path:
@@ -222,10 +222,10 @@ proc getPredefinedRegHandle(strkey: string): RegHandle =
 proc parseRegPath(path: string, outSubkey: var string): RegHandle =
   var rootStr: string
   if not splitRegPath(path, rootStr, outSubkey):
-    raise newException(RegistryError, "invalid path")
+    raise newException(OSError, "invalid path")
   result = getPredefinedRegHandle(rootStr)
   if result == 0.RegHandle:
-    raise newException(RegistryError, "unsupported path root")
+    raise newException(OSError, "unsupported path root")
 
 proc allocWinString(str: string): WinString {.inline.} =
   when useWinUnicode:
@@ -252,9 +252,9 @@ proc regThrowOnFailInternal(hresult: LONG): void =
       result = $msgbuf
       if msgbuf != nil: localFree(msgbuf)
   if result.len == 0:
-    raise newException(RegistryError, "unknown error")
+    raise newException(OSError, "unknown error")
   else:
-    raise newException(RegistryError, result)
+    raise newException(OSError, result)
 
 template regThrowOnFail(hresult: LONG) =
   if hresult != ERROR_SUCCESS:
@@ -278,16 +278,16 @@ proc createKeyInternal(handle: RegHandle, subkey: string,
 
 proc create*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
-  ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
+  ## creates new `subkey`. ``OSError`` is raised if key already exists.
   ##
   ## .. code-block:: nim
   ##   create(HKEY_LOCAL_MACHINE, "Software\\My Soft", samRead or samWrite)
   if createKeyInternal(handle, subkey, samDesired, result.addr) !=
       REG_CREATED_NEW_KEY:
-    raise newException(RegistryError, "key already exists")
+    raise newException(OSError, "key already exists")
 
 proc create*(path: string, samDesired: RegKeyRights): RegHandle {.sideEffect.} =
-  ## creates new `subkey`. ``RegistryError`` is raised if key already exists.
+  ## creates new `subkey`. ``OSError`` is raised if key already exists.
   ##
   ## .. code-block:: nim
   ##   create("HKEY_LOCAL_MACHINE\\Software\\My Soft", samRead or samWrite)
@@ -297,7 +297,7 @@ proc create*(path: string, samDesired: RegKeyRights): RegHandle {.sideEffect.} =
 proc createOrOpen*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## same as `create<#create,RegHandle,string,RegKeyRights>`_ proc, but does not
-  ## raise ``RegistryError`` if key already exists.
+  ## raise ``OSError`` if key already exists.
   ##
   ## .. code-block:: nim
   ##   createOrOpen(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
@@ -306,7 +306,7 @@ proc createOrOpen*(handle: RegHandle, subkey: string,
 proc createOrOpen*(path: string,
     samDesired: RegKeyRights): RegHandle {.sideEffect.} =
   ## same as `create<#create,string,RegKeyRights>`_ proc, but does not
-  ## raise ``RegistryError`` if key already exists.
+  ## raise ``OSError`` if key already exists.
   ##
   ## .. code-block:: nim
   ##   createOrOpen("HKEY_LOCAL_MACHINE\\Software", samRead or samWrite)
@@ -316,7 +316,7 @@ proc createOrOpen*(path: string,
 proc open*(handle: RegHandle, subkey: string,
     samDesired: RegKeyRights = samDefault): RegHandle {.sideEffect.} =
   ## opens the specified registry key. Note that key names are
-  ## not case sensitive. Raises ``RegistryError`` when `handle` is invalid or
+  ## not case sensitive. Raises ``OSError`` when `handle` is invalid or
   ## `subkey` does not exist.
   ##
   ## .. code-block:: nim
@@ -514,13 +514,13 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     dealloc(buff)
     regThrowOnFailInternal(status)
 
-proc readString*(handle: RegHandle, key: string): TaintedString {.sideEffect.} =
+proc readString*(handle: RegHandle, key: string): string {.sideEffect.} =
   ## reads value of type ``REG_SZ`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_SZ)
-  result = TaintedString($(cast[WinString](buff)))
+  result = $(cast[WinString](buff))
   dealloc(buff)
 
-proc readExpandString*(handle: RegHandle, key: string): TaintedString
+proc readExpandString*(handle: RegHandle, key: string): string
     {.sideEffect.} =
   ## reads value of type ``REG_EXPAND_SZ`` from registry key. The key must have
   ## been opened with the ``samQueryValue`` access right.
@@ -528,7 +528,7 @@ proc readExpandString*(handle: RegHandle, key: string): TaintedString
   ## variables.
   # data not supported error thrown without RRF_NOEXPAND
   injectRegKeyReader(handle, key, RRF_RT_REG_EXPAND_SZ or RRF_NOEXPAND)
-  result = TaintedString($(cast[WinString](buff)))
+  result = $(cast[WinString](buff))
   dealloc(buff)
 
 proc readMultiString*(handle: RegHandle, key: string): seq[string]
@@ -653,104 +653,3 @@ proc expandEnvString*(str: string): string =
     return ""
   result = $(cast[WinString](buff))
   dealloc(buff)
-
-when compileOption("taintmode"):
-  proc expandEnvString*(str: TaintedString): string =
-    ## expandEnvString for TaintedString.
-    expandEnvString(str.string)
-
-when isMainModule:
-  import sequtils
-
-  var passed = true
-  var msg, stacktrace: string
-  var handle, innerHandle: RegHandle
-  try:
-    handle = createOrOpen("HKEY_LOCAL_MACHINE\\Software\\AAAnim_reg_test",
-      samRead or samWrite or samWow32)
-
-    # String
-    handle.writeString("StringValue", "StringData")
-    assert(handle.readString("StringValue").string == "StringData")
-    handle.writeString("StringPathValue", "C:\\Dir\\File")
-    assert(handle.readString("StringPathValue").string == "C:\\Dir\\File")
-    
-    # Binary
-    handle.writeBinary("BinaryValue", [0xff.byte, 0x00])
-    let binaryData = handle.readBinary("BinaryValue")
-    assert(binaryData[0] == 0xff)
-    assert(binaryData[1] == 0x00)
-    
-    # Int32
-    handle.writeInt32("Int32Value", 1000)
-    assert(handle.readInt32("Int32Value") == 1000)
-    handle.writeInt32("Int32ValueMin", -2147483647)
-    assert(handle.readInt32("Int32ValueMin") == -2147483647)
-    handle.writeInt32("Int32ValueMax", 2147483647)
-    assert(handle.readInt32("Int32ValueMax") == 2147483647)
-
-    # Int64
-    handle.writeInt64("Int64Value", 1000)
-    assert(handle.readInt64("Int64Value") == 1000)
-    handle.writeInt64("Int64ValueMin", -9223372036854775807)
-    assert(handle.readInt64("Int64ValueMin") == -9223372036854775807)
-    handle.writeInt64("Int64ValueMax", 9223372036854775807)
-    assert(handle.readInt64("Int64ValueMax") == 9223372036854775807)
-
-    # Expand String
-    handle.writeExpandString("ExpandStringValue", "%PATH%")
-    assert(handle.readExpandString("ExpandStringValue").expandEnvString() != "%PATH%")
-
-    # Multi String
-    handle.writeMultiString("MultiStringValue", ["Hello, world!", "\u03AB世界", "世ϵ界", ""])
-    var multiString = handle.readMultiString("MultiStringValue")
-    assert(multiString.len == 3)
-    assert(multiString[0] == "Hello, world!")
-    assert(multiString[1] == "\u03AB世界")
-    assert(multiString[2] == "世ϵ界")
-
-    # Key/subkey/value operations
-    innerHandle = create(handle, "InnerKey", samAll)
-    assert(innerHandle.countSubkeys() == 0)
-    var numValues = innerHandle.countValues() 
-    assert(numValues == 0)
-    assert(numValues == toSeq(innerHandle.enumValueNames()).len)
-
-    innerHandle.writeString("InnerStringValue", "Hello")
-    numValues = innerHandle.countValues()
-    var valueNames = toSeq(innerHandle.enumValueNames())
-    assert(numValues == 1)
-    assert(numValues == valueNames.len)
-    assert(valueNames[0] == "InnerStringValue")
-
-    close(innerHandle)
-
-    assert(handle.countSubkeys() == 1)
-    innerHandle = create(handle, "InnerKey_second", samAll)
-    close(innerHandle)
-    innerHandle = 0.RegHandle
-
-    assert(handle.countSubkeys() == 2)
-    delSubkey(handle, "InnerKey")
-    assert(handle.countSubkeys() == 1)
-    delTree(handle, "")
-    assert(handle.countSubkeys() == 0)
-
-    close(handle)
-    handle = 0.RegHandle
-
-    # delSubkey(HKEY_LOCAL_MACHINE, "Software\\AAAnim_reg_test", samWow32)
-  except RegistryError, AssertionError:
-    passed = false
-    msg = getCurrentExceptionMsg()
-    stacktrace = getStackTrace(getCurrentException())
-  finally:
-    close(handle)
-    close(innerHandle)
-    if passed:
-      echo "tests passed"
-      quit(QuitSuccess)
-    else:
-      echo "tests failed: ", msg
-      echo stacktrace
-      quit(QuitFailure)
