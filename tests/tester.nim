@@ -1,6 +1,4 @@
-import sequtils, winregistry, winlean
-
-echo "unicode: " & $useWinUnicode
+import sequtils, winregistry
 
 var passed = true
 var msg, stacktrace: string
@@ -80,7 +78,7 @@ try:
   handle = 0.RegHandle
 
   # delSubkey(HKEY_LOCAL_MACHINE, "Software\\AAAnim_reg_test", samWow32)
-except OSError, AssertionDefect:
+except:
   passed = false
   msg = getCurrentExceptionMsg()
   stacktrace = getStackTrace(getCurrentException())

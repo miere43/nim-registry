@@ -2,8 +2,6 @@
 
 Deal with Windows Registry from Nim.
 
-Online docs here: http://miere.ru/docs/registry/
-
 ```nim
 import winregistry
 
@@ -28,11 +26,15 @@ finally:
 Run in command line:
 ```
 $ nimble test
-$ nimble testansi
 ```
 You should see a "tests passed" message. If you get `Access is denied` error, try running with administrator rights.
 
 ## Changelog
+### 2.0.0
+- Added support for Nim 2.0.0
+- Removed support for `useWinUnicode` switch
+- `WinString` type was removed; use `WideCString` instead
+
 ### 1.0.0
 - `RegValueKind` and `RegKeyRights` are distinct `uint32`'s now (fixed warning about enums with holes).
 - Replaced `RegistryError` with `OSError` for consistency with built-in `registry` package.

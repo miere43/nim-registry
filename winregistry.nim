@@ -63,13 +63,6 @@ proc `|`*(a, b: RegKeyRights): RegKeyRights {.inline.} =
   ## alias for ``or`` for ``RegKeyRights``.
   a or b
 
-when useWinUnicode:
-  type WinString* = WideCString ## ``cstring`` when ``useWinAscii``
-                                ## is declared or  ``WideCString`` otherwise.
-else:
-  type WinString* = cstring ## ``cstring`` when ``useWinAscii``
-                            ## is declared or  ``WideCString`` otherwise.
-
 const
   nullDwordPtr: ptr DWORD = cast[ptr DWORD](0)
 
@@ -102,100 +95,52 @@ proc regOpenCurrentUser(samDesired: RegKeyRights,
   phkResult: ptr RegHandle): LONG
   {.stdcall, dynlib: "advapi32", importc: "RegOpenCurrentUser".}
 
-when useWinUnicode:
-  proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
-    samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExW".}
+proc regOpenKeyEx(handle: RegHandle, lpSubKey: WideCString, ulOptions: DWORD,
+  samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExW".}
 
-  proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WinString,
-    dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
-    pcbData: ptr DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegGetValueW".}
+proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WideCString,
+  dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
+  pcbData: ptr DWORD): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegGetValueW".}
 
-  proc regDeleteKeyEx(handle: RegHandle, lpSubKey: WinString,
-    samDesired: RegKeyRights, Reserved: DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegDeleteKeyExW".}
+proc regDeleteKeyEx(handle: RegHandle, lpSubKey: WideCString,
+  samDesired: RegKeyRights, Reserved: DWORD): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegDeleteKeyExW".}
 
-  proc regDeleteTree(handle: RegHandle, lpSubKey: WinString): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegDeleteTreeW".}
+proc regDeleteTree(handle: RegHandle, lpSubKey: WideCString): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegDeleteTreeW".}
 
-  proc regCreateKeyEx(handle: RegHandle, lpSubKey: WinString, Reserved: DWORD,
-    lpClass: cstring, dwOptions: DWORD, samDesired: RegKeyRights,
-    lpSecurityAttributes: ptr SecurityAttributes, phkResult: ptr RegHandle,
-    lpdwDisposition: ptr LONG): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegCreateKeyExW".}
+proc regCreateKeyEx(handle: RegHandle, lpSubKey: WideCString, Reserved: DWORD,
+  lpClass: cstring, dwOptions: DWORD, samDesired: RegKeyRights,
+  lpSecurityAttributes: ptr SecurityAttributes, phkResult: ptr RegHandle,
+  lpdwDisposition: ptr LONG): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegCreateKeyExW".}
 
-  proc regSetValueEx(handle: RegHandle, lpValueName: WinString, Reserved: DWORD,
-    dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegSetValueExW".}
+proc regSetValueEx(handle: RegHandle, lpValueName: WideCString, Reserved: DWORD,
+  dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegSetValueExW".}
 
-  proc expandEnvironmentStrings(lpSrc: WinString, lpDst: pointer,
-    nSize: DWORD): DWORD
-    {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsW".}
+proc expandEnvironmentStrings(lpSrc: WideCString, lpDst: pointer,
+  nSize: DWORD): DWORD
+  {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsW".}
 
-  proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WinString,
-    lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WinString,
-    lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegEnumKeyExW".}
+proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WideCString,
+  lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WideCString,
+  lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegEnumKeyExW".}
 
-  proc regEnumValue(hKey: RegHandle, dwIndex: DWORD, lpValueName: WinString,
-    lpcchValueName: ptr DWORD, lpReserved: ptr DWORD, lpType: ptr DWORD,
-    lpData: ptr uint8, lpcbData: ptr DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegEnumValueW".}
+proc regEnumValue(hKey: RegHandle, dwIndex: DWORD, lpValueName: WideCString,
+  lpcchValueName: ptr DWORD, lpReserved: ptr DWORD, lpType: ptr DWORD,
+  lpData: ptr uint8, lpcbData: ptr DWORD): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegEnumValueW".}
 
-  proc regQueryInfoKey(hKey: RegHandle, lpClass: WinString, lpcClass: ptr DWORD,
-    lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
-    lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
-    lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
-    lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegQueryInfoKeyW".}
-else:
-  proc regOpenKeyEx(handle: RegHandle, lpSubKey: WinString, ulOptions: DWORD,
-    samDesired: RegKeyRights, phkResult: ptr RegHandle): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegOpenKeyExA".}
-
-  proc regGetValue(handle: RegHandle, lpSubKey, lpValue: WinString,
-    dwFlags: DWORD, pdwType: ptr RegValueKind, pvData: pointer,
-    pcbData: ptr DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegGetValueA".}
-
-  proc regDeleteKeyEx(handle: RegHandle, lpSubKey: WinString,
-    samDesired: RegKeyRights, Reserved: DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegDeleteKeyExA".}
-
-  proc regDeleteTree(handle: RegHandle, lpSubKey: WinString): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegDeleteTreeA".}
-
-  proc regCreateKeyEx(handle: RegHandle, lpSubKey: WinString, Reserved: DWORD,
-    lpClass: cstring, dwOptions: DWORD, samDesired: RegKeyRights,
-    lpSecurityAttributes: ptr SecurityAttributes, phkResult: ptr RegHandle,
-    lpdwDisposition: ptr LONG): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegCreateKeyExA".}
-
-  proc regSetValueEx(handle: RegHandle, lpValueName: WinString, Reserved: DWORD,
-    dwType: RegValueKind, lpData: pointer, cbData: DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegSetValueExA".}
-
-  proc expandEnvironmentStrings(lpSrc: WinString, lpDst: pointer,
-    nSize: DWORD): DWORD
-    {.stdcall, dynlib: "kernel32", importc: "ExpandEnvironmentStringsA".}
-
-  proc regEnumKeyEx(hKey: RegHandle, dwIndex: DWORD, lpName: WinString,
-    lpcName: ptr DWORD, lpReserved: ptr DWORD, lpClass: WinString,
-    lpcClass: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegEnumKeyExA".}
-
-  proc regEnumValue(hKey: RegHandle, dwIndex: DWORD, lpValueName: WinString,
-    lpcchValueName: ptr DWORD, lpReserved: ptr DWORD, lpType: ptr DWORD,
-    lpData: ptr uint8, lpcbData: ptr DWORD): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegEnumValueA".}
-
-  proc regQueryInfoKey(hKey: RegHandle, lpClass: WinString, lpcClass: ptr DWORD,
-    lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
-    lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
-    lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
-    lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
-    {.stdcall, dynlib: "advapi32", importc: "RegQueryInfoKeyA".}
+proc regQueryInfoKey(hKey: RegHandle, lpClass: WideCString, lpcClass: ptr DWORD,
+  lpReserved: ptr DWORD, lpcSubKeys: ptr DWORD, lpcMaxSubKeyLen: ptr DWORD,
+  lpcMaxClassLen: ptr DWORD, lpcValues: ptr DWORD,
+  lpcMaxValueNameLen: ptr DWORD, lpcMaxValueLen: ptr DWORD,
+  lpcbSecurityDescriptor: ptr DWORD, lpftLastWriteTime: ptr FILETIME): LONG
+  {.stdcall, dynlib: "advapi32", importc: "RegQueryInfoKeyW".}
 
 proc splitRegPath(path: string, root: var string, other: var string): bool =
   var sliceEnd = 0
@@ -227,30 +172,17 @@ proc parseRegPath(path: string, outSubkey: var string): RegHandle =
   if result == 0.RegHandle:
     raise newException(OSError, "unsupported path root")
 
-proc allocWinString(str: string): WinString {.inline.} =
-  when useWinUnicode:
-    return newWideCString(str)
-  else:
-    return cstring(str)
-
 proc regThrowOnFailInternal(hresult: LONG): void =
   when defined(debug):
     const langid = 1033 # show english error msgs
   else:
     const langid = 0
   var result: string
-  when useWinUnicode:
-    var msgbuf: WideCString
-    if formatMessageW(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
-                      nil, hresult.int32, langid, msgbuf.addr, 0, nil) != 0'i32:
-      result = $msgbuf
-      if msgbuf != nil: localFree(cast[pointer](msgbuf))
-  else:
-    var msgbuf: cstring
-    if formatMessageA(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
+  var msgbuf: WideCString
+  if formatMessageW(0x00000100 or 0x00001000 or 0x00000200 or 0x000000FF,
                     nil, hresult.int32, langid, msgbuf.addr, 0, nil) != 0'i32:
-      result = $msgbuf
-      if msgbuf != nil: localFree(msgbuf)
+    result = $msgbuf
+    if msgbuf != nil: localFree(cast[pointer](msgbuf))
   if result.len == 0:
     raise newException(OSError, "unknown error")
   else:
@@ -264,16 +196,13 @@ template injectRegPathSplit(path: string) =
   var subkey {.inject.}: string
   var root {.inject.}: RegHandle = parseRegPath(path, subkey)
 
-proc reallen(x: WinString): int {.inline.} =
+proc reallen(x: WideCString): int {.inline.} =
   ## returns real string length in bytes, counts chars and terminating null.
-  when declared(useWinUnicode):
-    len(x) * 2 + 2
-  else:
-    len(x) + 1
+  len(x) * 2 + 2
 
 proc createKeyInternal(handle: RegHandle, subkey: string,
   samDesired: RegKeyRights, outHandle: ptr RegHandle): LONG {.sideEffect.} =
-  regThrowOnFail(regCreateKeyEx(handle, allocWinString(subkey), 0.DWORD, nil,
+  regThrowOnFail(regCreateKeyEx(handle, newWideCString(subkey), 0.DWORD, nil,
     0.DWORD, samDesired, nil, outHandle, result.addr))
 
 proc create*(handle: RegHandle, subkey: string,
@@ -321,7 +250,7 @@ proc open*(handle: RegHandle, subkey: string,
   ##
   ## .. code-block:: nim
   ##   open(HKEY_LOCAL_MACHINE, "Software", samRead or samWrite)
-  regThrowOnFail(regOpenKeyEx(handle, allocWinString(subkey), 0.DWORD,
+  regThrowOnFail(regOpenKeyEx(handle, newWideCString(subkey), 0.DWORD,
     samDesired, result.addr))
 
 proc open*(path: string, samDesired: RegKeyRights = samDefault): RegHandle
@@ -362,12 +291,12 @@ proc close*(handles: varargs[RegHandle]) {.inline, sideEffect.} =
     close(handle)
 
 proc queryMaxKeyLength(handle: RegHandle): DWORD {.sideEffect.} =
-  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WideCString](0), nullDwordPtr,
     nullDwordPtr, nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
 proc queryMaxValueNameLength(handle: RegHandle): DWORD {.sideEffect.} =
-  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WideCString](0), nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr,
     result.addr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
@@ -375,14 +304,14 @@ proc countValues*(handle: RegHandle): int32 {.sideEffect.} =
   ## returns number of key-value pairs that are associated with the
   ## specified registry key. Does not count default key-value pair.
   ## The key must have been opened with the ``samQueryValue`` access right.
-  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WideCString](0), nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, nullDwordPtr, result.addr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
 proc countSubkeys*(handle: RegHandle): int32 {.sideEffect.} =
   ## returns number of subkeys that are contained by the specified registry key.
   ## The key must have been opened with the ``samQueryValue`` access right.
-  regThrowOnFail(regQueryInfoKey(handle, cast[WinString](0), nullDwordPtr,
+  regThrowOnFail(regQueryInfoKey(handle, cast[WideCString](0), nullDwordPtr,
     nullDwordPtr, result.addr, nullDwordPtr, nullDwordPtr, nullDwordPtr,
     nullDwordPtr, nullDwordPtr, nullDwordPtr, cast[ptr FILETIME](0)))
 
@@ -400,15 +329,15 @@ iterator enumSubkeys*(handle: RegHandle): string {.sideEffect.} =
 
     while true:
       var numCharsReaded = sizeChars
-      var returnValue = regEnumKeyEx(handle, index, cast[WinString](keyBuffer),
-        numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WinString](0),
+      var returnValue = regEnumKeyEx(handle, index, cast[WideCString](keyBuffer),
+        numCharsReaded.addr, cast[ptr DWORD](0.DWORD), cast[WideCString](0),
         cast[ptr DWORD](0.DWORD), cast[ptr FILETIME](0.DWORD))
 
       case returnValue
       of ERROR_NO_MORE_ITEMS:
         break
       of ERROR_SUCCESS:
-        yield $(cast[WinString](keyBuffer))
+        yield $(cast[WideCString](keyBuffer))
         inc index
       else:
         regThrowOnFailInternal(returnValue)
@@ -430,7 +359,7 @@ iterator enumValueNames*(handle: RegHandle): string {.sideEffect.} =
 
     while true:
       var numCharsReaded = maxValueNameLength
-      var status = regEnumValue(handle, index, cast[WinString](nameBuffer), 
+      var status = regEnumValue(handle, index, cast[WideCString](nameBuffer), 
         numCharsReaded.addr, nullDwordPtr, nullDwordPtr, cast[ptr uint8](0),
         nullDwordPtr)
 
@@ -438,7 +367,7 @@ iterator enumValueNames*(handle: RegHandle): string {.sideEffect.} =
       of ERROR_NO_MORE_ITEMS:
         break
       of ERROR_SUCCESS:
-        yield $(cast[WinString](nameBuffer))
+        yield $(cast[WideCString](nameBuffer))
         inc index
       else:
         regThrowOnFailInternal(status)
@@ -452,15 +381,15 @@ proc writeString*(handle: RegHandle, key, value: string) {.sideEffect.} =
   ##
   ## .. code-block:: nim
   ##   writeString(handle, "hello", "world")
-  var valueWS = allocWinString(value)
-  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regSZ,
-    cast[pointer](valueWS), (reallen(valueWS)).DWORD))
+  var valueWS = newWideCString(value)
+  regThrowOnFail(regSetValueEx(handle, newWideCString(key), 0.DWORD, regSZ,
+    cast[pointer](addr valueWS[0]), (reallen(valueWS)).DWORD))
 
 proc writeExpandString*(handle: RegHandle, key, value: string) {.sideEffect.} =
   ## writes value of type ``REG_EXPAND_SZ`` to specified key.
-  var valueWS = allocWinString(value)
-  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD,
-    regExpandSZ, cast[pointer](valueWS), (reallen(valueWS)).DWORD))
+  var valueWS = newWideCString(value)
+  regThrowOnFail(regSetValueEx(handle, newWideCString(key), 0.DWORD,
+    regExpandSZ, cast[pointer](addr valueWS[0]), (reallen(valueWS)).DWORD))
 
 proc writeMultiString*(handle: RegHandle, key: string, value: openArray[string])
     {.sideEffect.} =
@@ -471,28 +400,28 @@ proc writeMultiString*(handle: RegHandle, key: string, value: openArray[string])
   var data: seq[WinChar] = @[]
   for str in items(value):
     if str.len == 0: continue
-    var strWS = allocWinString(str)
+    var strWS = newWideCString(str)
     # not 0..strLen-1 because we need '\0' or '\0\0' too
     for i in 0..len(strWS):
       data.add(strWS[i])
   data.add(0.WinChar) # same as '\0'
-  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regMultiSZ,
+  regThrowOnFail(regSetValueEx(handle, newWideCString(key), 0.DWORD, regMultiSZ,
     data[0].addr, data.len().DWORD * sizeof(WinChar).DWORD))
 
 proc writeInt32*(handle: RegHandle, key: string, value: int32) {.sideEffect.} =
   ## writes value of type ``REG_DWORD`` to specified key.
-  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regDword,
+  regThrowOnFail(regSetValueEx(handle, newWideCString(key), 0.DWORD, regDword,
     value.unsafeAddr, sizeof(int32).DWORD))
 
 proc writeInt64*(handle: RegHandle, key: string, value: int64) {.sideEffect.} =
   ## writes value of type ``REG_QWORD`` to specified key.
-  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regQword,
+  regThrowOnFail(regSetValueEx(handle, newWideCString(key), 0.DWORD, regQword,
     value.unsafeAddr, sizeof(int64).DWORD))
 
 proc writeBinary*(handle: RegHandle, key: string, value: openArray[byte])
     {.sideEffect.} =
   ## writes value of type ``REG_BINARY`` to specified key.
-  regThrowOnFail(regSetValueEx(handle, allocWinString(key), 0.DWORD, regBinary,
+  regThrowOnFail(regSetValueEx(handle, newWideCString(key), 0.DWORD, regBinary,
     value[0].unsafeAddr, value.len().DWORD))
 
 template injectRegKeyReader(handle: RegHandle, key: string,
@@ -502,7 +431,7 @@ template injectRegKeyReader(handle: RegHandle, key: string,
     size {.inject.}: DWORD = 32
     buff {.inject.}: pointer = alloc(size)
     kind: RegValueKind
-    keyWS = allocWinString(key)
+    keyWS = newWideCString(key)
     status = regGetValue(handle, nil, keyWS, allowedDataTypes, kind.addr,
       buff, size.addr)
   if status == ERROR_MORE_DATA:
@@ -517,7 +446,7 @@ template injectRegKeyReader(handle: RegHandle, key: string,
 proc readString*(handle: RegHandle, key: string): string {.sideEffect.} =
   ## reads value of type ``REG_SZ`` from registry key.
   injectRegKeyReader(handle, key, RRF_RT_REG_SZ)
-  result = $(cast[WinString](buff))
+  result = $(cast[WideCString](buff))
   dealloc(buff)
 
 proc readExpandString*(handle: RegHandle, key: string): string
@@ -528,7 +457,7 @@ proc readExpandString*(handle: RegHandle, key: string): string
   ## variables.
   # data not supported error thrown without RRF_NOEXPAND
   injectRegKeyReader(handle, key, RRF_RT_REG_EXPAND_SZ or RRF_NOEXPAND)
-  result = $(cast[WinString](buff))
+  result = $(cast[WideCString](buff))
   dealloc(buff)
 
 proc readMultiString*(handle: RegHandle, key: string): seq[string]
@@ -542,43 +471,25 @@ proc readMultiString*(handle: RegHandle, key: string): seq[string]
     strBegin = 0
     running = true
     nullchars = 0
-  # each string separated by '\0', last string is `\0\0`
-  # unicode string separated by '\0\0', last str is '\0\0\0\0'
-  when useWinUnicode:
-    while running:
-      #echo "iter", i, ", c: ", strbuff[i].byte, ", addr: ", cast[int](buff) + i
-      if strbuff[i] == '\0' and strbuff[i+1] == '\0':
-        inc nullchars
-        if nullchars == 2:
-          running = false
-        else:
-          #echo "str at ", cast[int](buff) + strBegin
-          result.add $cast[WinString](cast[int](buff) + strBegin)
-          strBegin = i + 2
+  # each string separated by '\0\0', last string is `\0\0\0\0`
+  while running:
+    if strbuff[i] == '\0' and strbuff[i+1] == '\0':
+      inc nullchars
+      if nullchars == 2:
+        running = false
       else:
-        nullchars = 0
-      inc(i, 2)
-  else:
-    while running:
-      #echo "iter", i, ", c: ", strbuff[i].byte, ", addr: ", cast[int](buff) + i
-      if strbuff[i] == '\0':
-        inc nullchars
-        if nullchars == 2:
-          running = false
-        else:
-          #echo "str at ", cast[int](buff) + strBegin
-          result.add $cast[WinString](cast[int](buff) + strBegin)
-          strBegin = i + 1
-      else:
-        nullchars = 0
-      inc(i)
+        result.add $cast[WideCString](cast[int](buff) + strBegin)
+        strBegin = i + 2
+    else:
+      nullchars = 0
+    inc(i, 2)
 
 proc readInt32*(handle: RegHandle, key: string): int32 {.sideEffect.} =
   ## reads value of type ``REG_DWORD`` from registry key. The key must have
   ## been opened with the ``samQueryValue`` access right.
   var
     size: DWORD = sizeof(result).DWORD
-    keyWS = allocWinString(key)
+    keyWS = newWideCString(key)
     status = regGetValue(handle, nil, keyWS, RRF_RT_REG_DWORD, nil,
       result.addr, size.addr)
   regThrowOnFail(status)
@@ -588,7 +499,7 @@ proc readInt64*(handle: RegHandle, key: string): int64 {.sideEffect.} =
   ## been opened with the ``samQueryValue`` access right.
   var
     size: DWORD = sizeof(result).DWORD
-    keyWS = allocWinString(key)
+    keyWS = newWideCString(key)
     status = regGetValue(handle, nil, keyWS, RRF_RT_REG_QWORD, nil,
       result.addr, size.addr)
   regThrowOnFail(status)
@@ -610,7 +521,7 @@ proc delSubkey*(handle: RegHandle, subkey: string,
   ## To delete keys recursively, use the `delTree<#delTree>`_.
   ##
   ## `samDesired` should be ``samWow32`` or ``samWow64``.
-  regThrowOnFail(regDeleteKeyEx(handle, allocWinString(subkey), samDesired,
+  regThrowOnFail(regDeleteKeyEx(handle, newWideCString(subkey), samDesired,
     0.DWORD))
 
 proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
@@ -619,8 +530,8 @@ proc delTree*(handle: RegHandle, subkey: string) {.sideEffect.} =
   ##
   ## The key must have been opened with ``samDelete``, ``samEnumSubkeys``
   ## and ``samQueryValue`` access rights.
-  let winSubkey = if subkey.len == 0: cast[WinString](nil) 
-                  else: allocWinString(subkey)
+  let winSubkey = if subkey.len == 0: cast[WideCString](nil) 
+                  else: newWideCString(subkey)
   regThrowOnFail(regDeleteTree(handle, winSubkey))
 
 proc expandEnvString*(str: string): string =
@@ -633,15 +544,13 @@ proc expandEnvString*(str: string): string =
   var
     size: DWORD = 32 * sizeof(WinChar)
     buff: pointer = alloc(size)
-    valueWS = allocWinString(str)
+    valueWS = newWideCString(str)
   var returnValue = expandEnvironmentStrings(valueWS, buff, size)
   if returnValue == 0:
     dealloc(buff)
     return ""
   # return value is in TCHARs, aka number of chars returned, not number of
   # bytes required to store string
-  # WinChar is `char` or `Utf16Char` depending on useWinUnicode const in winlean
-  # actually needs to be checked because without this line everything works okay
   returnValue = returnValue * sizeof(WinChar).DWORD
   if returnValue > size:
     # buffer size was not enough to expand string
@@ -651,5 +560,5 @@ proc expandEnvString*(str: string): string =
   if returnValue == 0:
     dealloc(buff)
     return ""
-  result = $(cast[WinString](buff))
+  result = $(cast[WideCString](buff))
   dealloc(buff)
